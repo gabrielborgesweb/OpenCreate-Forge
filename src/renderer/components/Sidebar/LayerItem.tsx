@@ -52,6 +52,8 @@ const LayerItem: React.FC<LayerItemProps> = ({
     }
   }, [isEditing]);
 
+
+
   const toggleVisibility = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleLayerVisibility(projectId, layer.id);
@@ -213,7 +215,10 @@ const LayerItem: React.FC<LayerItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <div className="text-[0.85rem] truncate" onDoubleClick={() => setIsEditing(true)}>
+          <div className="text-[0.85rem] truncate" onDoubleClick={() => {
+            setEditName(layer.name);
+            setIsEditing(true);
+          }}>
             {layer.name}
           </div>
         )}

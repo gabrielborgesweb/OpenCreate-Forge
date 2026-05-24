@@ -3,6 +3,7 @@
  */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
+import { useUIStore } from "@store/uiStore";
 
 export class EraserTool extends BaseTool {
   id: ToolId = "eraser";
@@ -77,6 +78,11 @@ export class EraserTool extends BaseTool {
 
     const layer = context.project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked || !layer.visible) return;
+
+    if (layer.type !== "raster") {
+      useUIStore.getState().showToast("Cannot erase on a non-raster layer", "warning");
+      return;
+    }
 
     this.historySnapshot = createHistoryState(context.project);
 
