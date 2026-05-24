@@ -489,26 +489,19 @@ export class PencilTool extends BaseTool {
     return this.isDrawing ? this.layerId : null;
   }
 
+  getDrawingCanvas(): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+    if (this.isDrawing && this.offscreenCanvas) {
+      return {
+        canvas: this.offscreenCanvas,
+        x: this.strokeOriginX,
+        y: this.strokeOriginY,
+      };
+    }
+    return null;
+  }
+
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
     const settings = context.settings.pencil;
-
-    if (this.isDrawing && this.offscreenCanvas && this.layerId) {
-      const layer = context.project.layers.find((l) => l.id === this.layerId)!;
-      ctx.save();
-      ctx.setTransform(
-        context.project.zoom,
-        0,
-        0,
-        context.project.zoom,
-        context.project.panX,
-        context.project.panY,
-      );
-      ctx.globalAlpha = layer.opacity / 100;
-      ctx.globalCompositeOperation = layer.blendMode;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(this.offscreenCanvas, this.strokeOriginX, this.strokeOriginY);
-      ctx.restore();
-    }
 
     // Pencil Preview
     if (this.isMouseOver) {

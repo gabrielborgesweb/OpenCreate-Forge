@@ -110,6 +110,13 @@ export abstract class BaseTool {
   }
 
   /**
+   * Returns the active drawing canvas and its position if the tool is currently painting.
+   */
+  getDrawingCanvas(): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+    return null;
+  }
+
+  /**
    * Called during the render loop to allow tools to draw custom overlays (e.g., guides, brush previews).
    */
   onRender(_ctx: CanvasRenderingContext2D, _context: ToolContext): void {}

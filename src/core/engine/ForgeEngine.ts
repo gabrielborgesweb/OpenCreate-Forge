@@ -1362,23 +1362,29 @@ export class ForgeEngine {
       ctx.translate(-centerX, -centerY);
     }
 
-    switch (renderLayerTarget.type) {
-      case "raster":
-        RasterLayer.render(
-          ctx,
-          renderLayerTarget,
-          this.layerCanvasCache,
-          this.layerReadyCache,
-          this.imageCache,
-          () => this.render(),
-        );
-        break;
-      case "text":
-        TextLayer.render(ctx, renderLayerTarget, this.layerCanvasCache, this.layerReadyCache, editingState);
-        break;
-      case "group":
-        GroupLayer.render(ctx, renderLayerTarget);
-        break;
+    const drawingCanvas = isEditing ? tool?.getDrawingCanvas() : null;
+
+    if (drawingCanvas) {
+      ctx.drawImage(drawingCanvas.canvas, drawingCanvas.x, drawingCanvas.y);
+    } else {
+      switch (renderLayerTarget.type) {
+        case "raster":
+          RasterLayer.render(
+            ctx,
+            renderLayerTarget,
+            this.layerCanvasCache,
+            this.layerReadyCache,
+            this.imageCache,
+            () => this.render(),
+          );
+          break;
+        case "text":
+          TextLayer.render(ctx, renderLayerTarget, this.layerCanvasCache, this.layerReadyCache, editingState);
+          break;
+        case "group":
+          GroupLayer.render(ctx, renderLayerTarget);
+          break;
+      }
     }
     ctx.restore();
   }
