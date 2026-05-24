@@ -465,21 +465,7 @@ export class TransformTool extends BaseTool {
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
     if (!this.currentTransform || !this.originalLayer) return;
-    const t = this.currentTransform;
     const scale = context.project.zoom;
-
-    // Draw preview of the transformed layer
-    ctx.save();
-    ctx.translate(t.x, t.y);
-    ctx.rotate((t.rotation * Math.PI) / 180);
-    ctx.scale(t.scaleX, t.scaleY);
-
-    const layerCanvas = context.getLayerCanvas(this.originalLayer.id);
-    if (layerCanvas?.ready) {
-      ctx.globalAlpha = this.originalLayer.opacity / 100;
-      ctx.drawImage(layerCanvas.canvas, -t.width * t.anchor.x, -t.height * t.anchor.y);
-    }
-    ctx.restore();
 
     // Draw handles and borders
     const handles = this.getTransformHandles(context, false);

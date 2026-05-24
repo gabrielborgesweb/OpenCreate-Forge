@@ -1332,14 +1332,6 @@ export class ForgeEngine {
     ctx.globalAlpha = layer.opacity / 100;
     ctx.globalCompositeOperation = layer.blendMode;
 
-    if (layer.rotation) {
-      const centerX = layer.x + layer.width / 2;
-      const centerY = layer.y + layer.height / 2;
-      ctx.translate(centerX, centerY);
-      ctx.rotate((layer.rotation * Math.PI) / 180);
-      ctx.translate(-centerX, -centerY);
-    }
-
     const tool = this.getActiveTool();
     const isEditing = tool?.getEditingLayerId() === layer.id;
     const editingState = isEditing ? (tool as any).getEditingState?.() : undefined;
@@ -1348,11 +1340,33 @@ export class ForgeEngine {
       editingState.isCtrlPressed = this.isCtrlPressed;
     }
 
-    switch (layer.type) {
+    let renderLayerTarget = layer;
+
+    if (isEditing && tool?.id === "transform") {
+      const transform = useToolStore.getState().toolSettings.transform;
+      ctx.translate(transform.x, transform.y);
+      ctx.rotate((transform.rotation * Math.PI) / 180);
+      ctx.scale(transform.scaleX, transform.scaleY);
+
+      renderLayerTarget = {
+        ...layer,
+        x: -transform.width * transform.anchor.x,
+        y: -transform.height * transform.anchor.y,
+        rotation: 0,
+      };
+    } else if (layer.rotation) {
+      const centerX = layer.x + layer.width / 2;
+      const centerY = layer.y + layer.height / 2;
+      ctx.translate(centerX, centerY);
+      ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.translate(-centerX, -centerY);
+    }
+
+    switch (renderLayerTarget.type) {
       case "raster":
         RasterLayer.render(
           ctx,
-          layer,
+          renderLayerTarget,
           this.layerCanvasCache,
           this.layerReadyCache,
           this.imageCache,
@@ -1360,10 +1374,10 @@ export class ForgeEngine {
         );
         break;
       case "text":
-        TextLayer.render(ctx, layer, this.layerCanvasCache, this.layerReadyCache, editingState);
+        TextLayer.render(ctx, renderLayerTarget, this.layerCanvasCache, this.layerReadyCache, editingState);
         break;
       case "group":
-        GroupLayer.render(ctx, layer);
+        GroupLayer.render(ctx, renderLayerTarget);
         break;
     }
     ctx.restore();
