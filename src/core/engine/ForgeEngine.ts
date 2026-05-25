@@ -135,10 +135,10 @@ export class ForgeEngine {
    * Exports the current project with the specified options.
    */
   private handleExport = async (e: any) => {
-    const { format = "image/png", quality = 1, filename, filters } = e.detail || {};
+    const { format = "image/png", quality = 1, filename, filters, width, height } = e.detail || {};
 
     if (this.project) {
-      const dataURL = await this.exportProject(format, quality);
+      const dataURL = await this.exportProject(format, quality, width, height);
       if ((window as any).electronAPI) {
         const result = await (window as any).electronAPI.saveFile({
           dataURL,
@@ -264,9 +264,9 @@ export class ForgeEngine {
    * Handles a request for an export preview, generating a dataURL and calling the provided callback.
    */
   private handleRequestExportPreview = async (e: any) => {
-    const { format, quality, callback } = e.detail;
+    const { format, quality, callback, width, height } = e.detail;
     if (this.project) {
-      const dataURL = await this.exportProject(format, quality);
+      const dataURL = await this.exportProject(format, quality, width, height);
       callback(dataURL);
     }
   };
@@ -1714,20 +1714,33 @@ export class ForgeEngine {
   /**
    * Exports the project to a data URL with specific format and quality.
    */
-  public async exportProject(format: string = "image/png", quality: number = 1): Promise<string> {
+  public async exportProject(
+    format: string = "image/png",
+    quality: number = 1,
+    targetWidth?: number,
+    targetHeight?: number,
+  ): Promise<string> {
     if (!this.project) return "";
 
+    const finalWidth = targetWidth || this.project.width;
+    const finalHeight = targetHeight || this.project.height;
+
     const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = this.project.width;
-    exportCanvas.height = this.project.height;
+    exportCanvas.width = finalWidth;
+    exportCanvas.height = finalHeight;
     const exportCtx = exportCanvas.getContext("2d")!;
     exportCtx.imageSmoothingEnabled = false;
+
+    // Scale to target dimensions if provided
+    if (targetWidth || targetHeight) {
+      exportCtx.scale(finalWidth / this.project.width, finalHeight / this.project.height);
+    }
 
     // Fill background with white for JPEG exports if they don't have a background layer
     // (JPEG doesn't support transparency)
     if (format === "image/jpeg") {
       exportCtx.fillStyle = "#FFFFFF";
-      exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      exportCtx.fillRect(0, 0, this.project.width, this.project.height);
     }
 
     for (const layer of this.project.layers) {

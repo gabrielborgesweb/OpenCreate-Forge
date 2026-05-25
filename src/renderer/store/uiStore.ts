@@ -17,6 +17,9 @@ interface UIState {
   sidebarWidth: number;
   isSidebarExpanded: boolean;
   showRulers: boolean;
+  lastExportFormat: string;
+  lastExportQuality: number;
+  lastLockAspectRatio: boolean;
   setActiveTab: (tab: "home" | string) => void;
   removeFromHistory: (tabId: string) => void;
   showToast: (message: string, type?: "info" | "warning" | "error", duration?: number) => void;
@@ -25,6 +28,7 @@ interface UIState {
   setSidebarWidth: (width: number) => void;
   setIsSidebarExpanded: (expanded: boolean) => void;
   setShowRulers: (show: boolean) => void;
+  setExportSettings: (format: string, quality: number, lockAspectRatio: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -37,6 +41,9 @@ export const useUIStore = create<UIState>()(
       sidebarWidth: 280,
       isSidebarExpanded: true,
       showRulers: true,
+      lastExportFormat: "image/png",
+      lastExportQuality: 100,
+      lastLockAspectRatio: true,
       setActiveTab: (tab) =>
         set((state) => {
           const newHistory = state.tabHistory.filter((id) => id !== tab);
@@ -63,6 +70,12 @@ export const useUIStore = create<UIState>()(
       setSidebarWidth: (width) => set({ sidebarWidth: Math.max(200, Math.min(width, 600)) }),
       setIsSidebarExpanded: (expanded) => set({ isSidebarExpanded: expanded }),
       setShowRulers: (show) => set({ showRulers: show }),
+      setExportSettings: (format, quality, lockAspectRatio) =>
+        set({
+          lastExportFormat: format,
+          lastExportQuality: quality,
+          lastLockAspectRatio: lockAspectRatio,
+        }),
     }),
     {
       name: "forge-ui-storage",
@@ -72,6 +85,9 @@ export const useUIStore = create<UIState>()(
         sidebarWidth: state.sidebarWidth,
         isSidebarExpanded: state.isSidebarExpanded,
         showRulers: state.showRulers,
+        lastExportFormat: state.lastExportFormat,
+        lastExportQuality: state.lastExportQuality,
+        lastLockAspectRatio: state.lastLockAspectRatio,
       }),
     },
   ),

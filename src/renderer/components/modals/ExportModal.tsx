@@ -4,7 +4,18 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore } from "@store/projectStore";
-import { Info, ZoomIn, ZoomOut, Maximize, FileImage, ImageDown } from "lucide-react";
+import { useUIStore } from "@store/uiStore";
+import {
+  Info,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  // FileImage,
+  ImageDown,
+  // Link,
+  Link2,
+  Unlink2,
+} from "lucide-react";
 import BaseModal from "./BaseModal";
 
 interface ExportModalProps {
@@ -13,9 +24,24 @@ interface ExportModalProps {
 }
 
 const formats = [
-  { label: "PNG", value: "image/png", ext: "png" },
-  { label: "JPEG", value: "image/jpeg", ext: "jpg" },
-  { label: "WEBP", value: "image/webp", ext: "webp" },
+  {
+    label: "PNG",
+    value: "image/png",
+    ext: "png",
+    info: "PNG is a lossless format, ideal for graphics with transparency or sharp edges.",
+  },
+  {
+    label: "JPEG",
+    value: "image/jpeg",
+    ext: "jpg",
+    info: "JPEG is a lossy format, ideal for photographs and images with many colors.",
+  },
+  {
+    label: "WEBP",
+    value: "image/webp",
+    ext: "webp",
+    info: "WEBP is a modern format that offers both lossless and lossy compression.",
+  },
 ];
 
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
@@ -23,10 +49,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
   const projects = useProjectStore((state) => state.projects);
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
+  const setExportSettings = useUIStore((state) => state.setExportSettings);
+
   // Form State
   const [filename, setFilename] = useState("");
   const [format, setFormat] = useState(formats[0]);
   const [quality, setQuality] = useState(100);
+  const [exportWidth, setExportWidth] = useState(0);
+  const [exportHeight, setExportHeight] = useState(0);
+  const [lockAspectRatio, setLockAspectRatio] = useState(true);
 
   // Preview State
   const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -43,15 +74,37 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen && activeProject) {
       setFilename(activeProject.name);
-      setFormat(formats[0]);
-      setQuality(100);
+
+      // Load persisted settings (read once via getState to avoid infinite loop)
+      const {
+        lastExportFormat: savedFormat,
+        lastExportQuality: savedQuality,
+        lastLockAspectRatio: savedLock,
+      } = useUIStore.getState();
+      const persistedFormat = formats.find((f) => f.value === savedFormat) || formats[0];
+
+      setFormat(persistedFormat);
+      setQuality(savedQuality);
+      setLockAspectRatio(savedLock);
+
       setPan({ x: 0, y: 0 });
+      setPreviewUrl("");
+      setFileSize(null);
+      setExportWidth(activeProject.width);
+      setExportHeight(activeProject.height);
       setTimeout(() => {
         filenameInputRef.current?.focus();
         filenameInputRef.current?.select();
       }, 50);
     }
-  }, [isOpen, activeProject]);
+  }, [isOpen, activeProject]); // Removed lastExportFormat/Quality dependencies
+
+  // Persist settings when changed
+  useEffect(() => {
+    if (isOpen) {
+      setExportSettings(format.value, quality, lockAspectRatio);
+    }
+  }, [format.value, quality, lockAspectRatio, setExportSettings, isOpen]);
 
   // Generate preview and calculate size
   useEffect(() => {
@@ -63,6 +116,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
           detail: {
             format: format.value,
             quality: quality / 100,
+            width: exportWidth,
+            height: exportHeight,
             callback: (dataUrl: string) => {
               setPreviewUrl(dataUrl);
               // Calculate size
@@ -77,7 +132,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
 
     const timer = setTimeout(generatePreview, 300); // Debounce
     return () => clearTimeout(timer);
-  }, [isOpen, activeProject, format, quality]);
+  }, [isOpen, activeProject, format, quality, exportWidth, exportHeight]);
 
   // Viewport Logic (Matches engine feeling)
   const resetPreview = () => {
@@ -146,29 +201,42 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleExport = (e?: React.FormEvent) => {
+  const handleWidthChange = (val: number) => {
+    setExportWidth(val);
+    if (lockAspectRatio && activeProject) {
+      const ratio = activeProject.height / activeProject.width;
+      setExportHeight(Math.round(val * ratio));
+    }
+  };
+
+  const handleHeightChange = (val: number) => {
+    setExportHeight(val);
+    if (lockAspectRatio && activeProject) {
+      const ratio = activeProject.width / activeProject.height;
+      setExportWidth(Math.round(val * ratio));
+    }
+  };
+
+  const handleExport = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!activeProject) return;
 
     const filters = [{ name: format.label, extensions: [format.ext] }];
 
-    window.dispatchEvent(
+    await window.dispatchEvent(
       new CustomEvent("forge:export-project", {
         detail: {
           format: format.value,
           quality: quality / 100,
           filename: `${filename}.${format.ext}`,
           filters,
+          width: exportWidth,
+          height: exportHeight,
         },
       }),
     );
-    onClose();
-  };
 
-  const formatInfo = {
-    "image/png": "PNG is a lossless format, ideal for graphics with transparency or sharp edges.",
-    "image/jpeg": "JPEG is a lossy format best for photographs. It does not support transparency.",
-    "image/webp": "WebP provides superior compression and quality for web use.",
+    onClose();
   };
 
   if (!activeProject) return null;
@@ -221,9 +289,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             ) : (
               <div className="text-[#444] flex flex-col items-center gap-2">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
-                <span className="text-xs font-bold uppercase tracking-widest">
+                {/* <span className="text-xs font-bold uppercase tracking-widest">
                   Generating Preview...
-                </span>
+                </span> */}
               </div>
             )}
 
@@ -263,17 +331,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* Size Info Footer */}
-          <div className="p-3 bg-bg-secondary border-t border-bg-tertiary flex justify-between items-center px-4">
+          <div className="p-1 px-3 bg-bg-secondary border-t border-bg-tertiary flex justify-between items-center">
             <div className="flex items-center gap-2 text-[#999]">
-              <FileImage size={14} />
+              {/* <FileImage size={14} /> */}
               <span className="text-[0.65rem] font-bold uppercase tracking-wider">
-                {activeProject.width} × {activeProject.height} PX
+                {exportWidth} × {exportHeight} PX
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[0.65rem] text-[#666] uppercase tracking-wider">
+              {/* <span className="text-[0.65rem] text-[#666] uppercase tracking-wider">
                 Estimated Size
-              </span>
+              </span> */}
               <span className="text-xs font-mono font-bold text-accent">
                 {formatSize(fileSize)}
               </span>
@@ -306,7 +374,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                       const selected = formats.find((f) => f.value === e.target.value);
                       if (selected) setFormat(selected);
                     }}
-                    className="w-full bg-bg-primary border border-border text-text p-2 rounded text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-secondary"
+                    className="bg-bg-primary border border-border text-text p-2 rounded text-sm selection:bg-accent outline-none transition-all focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-secondary"
+                    // className="w-full bg-bg-primary border border-border text-text p-2 rounded text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-secondary"
                   >
                     {formats.map((f) => (
                       <option key={f.value} value={f.value}>
@@ -317,11 +386,71 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {/* Dimensions Section */}
+              <div className="space-y-2">
+                <label className="text-[0.75rem] text-[#999] font-medium">Export Size</label>
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 flex flex-col gap-1">
+                    <div className="bg-bg-primary border border-border flex items-center px-2 py-1.5 rounded selection:bg-accent focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-bg-secondary transition-all">
+                      <input
+                        type="number"
+                        value={exportWidth}
+                        min={1}
+                        onChange={(e) => handleWidthChange(parseInt(e.target.value) || 0)}
+                        className="bg-transparent border-none text-text text-sm w-full outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-[0.65rem] text-[#666] font-bold">px</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                    className={`py-2 rounded transition-colors ${
+                      lockAspectRatio ? "text-accent bg-accent/10" : "text-[#666] hover:bg-white/5"
+                    }`}
+                    title={lockAspectRatio ? "Unlock Aspect Ratio" : "Lock Aspect Ratio"}
+                  >
+                    {lockAspectRatio ? (
+                      <Link2 size={16} style={{ transform: "rotate(90deg)" }} />
+                    ) : (
+                      <Unlink2 size={16} style={{ transform: "rotate(90deg)" }} />
+                    )}
+                    {/* <Link2 size={16} style={{ transform: "rotate(90deg)" }} /> */}
+                  </button>
+
+                  <div className="flex-1 flex flex-col gap-1">
+                    <div className="bg-bg-primary border border-border flex items-center px-2 py-1.5 rounded selection:bg-accent focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-bg-secondary transition-all">
+                      <input
+                        type="number"
+                        value={exportHeight}
+                        min={1}
+                        onChange={(e) => handleHeightChange(parseInt(e.target.value) || 0)}
+                        className="bg-transparent border-none text-text text-sm w-full outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-[0.65rem] text-[#666] font-bold">px</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Quality Settings */}
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-center">
                   <label className="text-[0.75rem] text-[#999] font-medium">Quality</label>
-                  <span className="text-xs font-mono text-accent font-bold">{quality}%</span>
+                  <div className="flex items-center gap-1 bg-bg-primary border border-border hover:border-accent/50 px-1.5 py-0.5 rounded transition-all cursor-pointer group">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={quality}
+                      onChange={(e) =>
+                        setQuality(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))
+                      }
+                      className="bg-transparent border-none text-[0.75rem] w-8 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white font-medium"
+                    />
+                    <span className="text-[0.65rem] text-[#666] select-none font-bold">%</span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -342,8 +471,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <Info size={16} className="text-[#ccc] shrink-0 mt-0.5" />
-                <p className="text-[0.7rem] text-[#ccc] leading-normal font-medium text-pretty">
-                  {formatInfo[format.value as keyof typeof formatInfo]}
+                <p className="text-[0.7rem] text-[#ccc] leading-normal font-medium">
+                  {format.info}
                 </p>
               </div>
             </div>
