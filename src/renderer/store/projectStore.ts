@@ -2,6 +2,7 @@
  * Purpose: Core state management for projects, layers, selection, and history (undo/redo), including serialization and project initialization logic.
  */
 import { create } from "zustand";
+import { usePreferencesStore } from "./preferencesStore";
 
 /**
  * Represents a formatted segment of text with specific styling.
@@ -214,7 +215,7 @@ interface ProjectState {
   redo: (projectId: string) => void;
 }
 
-const MAX_HISTORY = 50;
+const getMaxHistory = () => usePreferencesStore.getState().historyLimit;
 
 export const createHistoryState = (project: Project): HistoryState => ({
   width: project.width,
@@ -232,9 +233,11 @@ export const getSerializableProject = (project: Project): any => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { isDirty, filePath, undoStack, redoStack, ...rest } = project;
 
+  const saveHistory = usePreferencesStore.getState().saveHistory;
+  const historyLimit = usePreferencesStore.getState().historyLimit;
+
   // We keep the history but limit it to avoid massive files due to Base64 data duplication.
-  // 20 steps is usually a good compromise for persisted history.
-  const persistedUndoStack = undoStack.slice(-20);
+  const persistedUndoStack = saveHistory ? undoStack.slice(-historyLimit) : [undoStack[0]];
 
   return {
     ...rest,
@@ -330,7 +333,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         }
 
         newUndoStack = [...project.undoStack, { description: newDescrition, state: historyState }];
-        if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+        if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
       }
 
       const id = partialLayer.id || Math.random().toString(36).substr(2, 9);
@@ -375,7 +378,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       if (!skipHistory) {
         const historyState = createHistoryState(project);
         newUndoStack = [...project.undoStack, { description: "Remove Layer", state: historyState }];
-        if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+        if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
       }
 
       const newLayers = project.layers.filter((l) => l.id !== layerId);
@@ -407,7 +410,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       if (!project) return state;
 
       const newUndoStack = [...project.undoStack, entry];
-      if (newUndoStack.length > MAX_HISTORY) {
+      if (newUndoStack.length > getMaxHistory()) {
         newUndoStack.shift();
       }
 
@@ -432,7 +435,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ...project.undoStack,
         { description: "Duplicate Layer", state: historyState },
       ];
-      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
       const newId = Math.random().toString(36).substr(2, 9);
       const newLayer = {
@@ -472,7 +475,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ...project.undoStack,
         { description: "Move Layer", state: historyState },
       ];
-      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
       const newLayers = [...project.layers];
       const [movedLayer] = newLayers.splice(fromIndex, 1);
@@ -520,7 +523,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ...project.undoStack,
         { description: "Rename Layer", state: historyState },
       ];
-      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
       return {
         projects: state.projects.map((p) =>
@@ -547,7 +550,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ...project.undoStack,
         { description: "Visibility Change", state: historyState },
       ];
-      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
       return {
         projects: state.projects.map((p) =>
@@ -574,7 +577,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ...project.undoStack,
         { description: "Lock Change", state: historyState },
       ];
-      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
       return {
         projects: state.projects.map((p) =>
@@ -663,7 +666,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       };
 
       const newUndoStack = [...project.undoStack, newEntry];
-      if (newUndoStack.length > MAX_HISTORY) {
+      if (newUndoStack.length > getMaxHistory()) {
         newUndoStack.shift();
       }
 

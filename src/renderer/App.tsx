@@ -12,12 +12,22 @@ import ProjectTabs from "./components/ProjectTabs";
 import HomeScreen from "./components/HomeScreen";
 import NewProject from "./components/modals/NewProject";
 import ExportModal from "./components/modals/ExportModal";
+import { PreferencesModal } from "./components/modals/PreferencesModal";
+import { usePreferencesStore } from "./store/preferencesStore";
+import { useAutosave } from "./hooks/useAutosave";
 import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
 import { useMenuHandler } from "./hooks/useMenuHandler";
 
 function App() {
   useMenuHandler();
+  useAutosave();
+  const theme = usePreferencesStore((state) => state.theme);
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
   const activeTab = useUIStore((state) => state.activeTab);
   const initializeStore = useProjectStore((state) => state.initialize);
   const projects = useProjectStore((state) => state.projects);
@@ -29,6 +39,7 @@ function App() {
 
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!(window as any).electronAPI) return;
@@ -201,13 +212,16 @@ function App() {
   React.useEffect(() => {
     const handleNewProject = () => setIsNewProjectModalOpen(true);
     const handleOpenExportModal = () => setIsExportModalOpen(true);
+    const handleOpenPreferences = () => setIsPreferencesModalOpen(true);
 
     window.addEventListener("forge:new-project", handleNewProject);
     window.addEventListener("forge:open-export-modal", handleOpenExportModal);
+    window.addEventListener("forge:open-preferences", handleOpenPreferences);
 
     return () => {
       window.removeEventListener("forge:new-project", handleNewProject);
       window.removeEventListener("forge:open-export-modal", handleOpenExportModal);
+      window.removeEventListener("forge:open-preferences", handleOpenPreferences);
     };
   }, []);
 
@@ -217,6 +231,7 @@ function App() {
 
       <NewProject isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
       <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} />
+      <PreferencesModal key={isPreferencesModalOpen ? "open" : "closed"} isOpen={isPreferencesModalOpen} onClose={() => setIsPreferencesModalOpen(false)} />
 
       {/* 1. Project Tabs */}
       <ProjectTabs />

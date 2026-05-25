@@ -44,6 +44,10 @@ export const useMenuHandler = () => {
           window.dispatchEvent(new CustomEvent("forge:new-project"));
           break;
 
+        case "preferences":
+          window.dispatchEvent(new CustomEvent("forge:open-preferences"));
+          break;
+
         case "open-project":
           try {
             const result = await (window as any).electronAPI.openProject();
