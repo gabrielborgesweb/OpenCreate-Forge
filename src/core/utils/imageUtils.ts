@@ -50,3 +50,29 @@ export function getOptimizedBoundingBox(
     height: maxY - minY + 1,
   };
 }
+
+/**
+ * Reduces the number of colors in ImageData based on quality (0-1).
+ * Simulates PNG color palette reduction (quantization).
+ */
+export function quantizeImageData(imageData: ImageData, quality: number) {
+  if (quality >= 1) return imageData;
+
+  const data = imageData.data;
+  // quality 1.0 -> 8 bits per channel (256 levels)
+  // quality 0.1 -> 1 bit per channel (2 levels)
+  // Linear mapping for simplicity, but could be adjusted for better "feel"
+  const bitsPerChannel = Math.max(1, Math.min(8, Math.round(1 + quality * 7)));
+  const levels = Math.pow(2, bitsPerChannel);
+  const factor = 255 / (levels - 1);
+
+  for (let i = 0; i < data.length; i += 4) {
+    // Quantize R, G, B channels
+    data[i] = Math.round(Math.round(data[i] / factor) * factor);
+    data[i + 1] = Math.round(Math.round(data[i + 1] / factor) * factor);
+    data[i + 2] = Math.round(Math.round(data[i + 2] / factor) * factor);
+    // Alpha is usually kept for transparency quality
+  }
+
+  return imageData;
+}

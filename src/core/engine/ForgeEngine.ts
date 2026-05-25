@@ -13,7 +13,7 @@ import { CropTool } from "../tools/CropTool";
 import { TextTool } from "../tools/TextTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useUIStore } from "@/renderer/store/uiStore";
-import { getOptimizedBoundingBox } from "../utils/imageUtils";
+import { getOptimizedBoundingBox, quantizeImageData } from "../utils/imageUtils";
 import { RasterLayer } from "../layers/RasterLayer";
 import { TextLayer } from "../layers/TextLayer";
 import { GroupLayer } from "../layers/GroupLayer";
@@ -127,18 +127,21 @@ export class ForgeEngine {
   };
 
   /**
-   * Exports the current project to a PNG file using the Electron API.
+   * Exports the current project with the specified options.
    */
-  private handleExportPNG = async () => {
+  private handleExport = async (e: any) => {
+    const { format = "image/png", quality = 1, filename, filters } = e.detail || {};
+
     if (this.project) {
-      const dataURL = await this.exportToPNG();
+      const dataURL = await this.exportProject(format, quality);
       if ((window as any).electronAPI) {
         const result = await (window as any).electronAPI.saveFile({
           dataURL,
-          defaultName: `${this.project.name}.png`,
+          defaultName: filename || `${this.project.name}.${format.split("/")[1]}`,
+          filters,
         });
         if (result.success) {
-          useUIStore.getState().showToast("Project exported as PNG", "info");
+          useUIStore.getState().showToast(`Project exported as ${format.split("/")[1].toUpperCase()}`, "info");
         }
       }
     }
@@ -245,9 +248,21 @@ export class ForgeEngine {
     window.addEventListener("forge:select-clear", this.handleClearSelection);
     window.addEventListener("forge:select-all", this.handleSelectAll);
     window.addEventListener("forge:duplicate-layer", this.handleDuplicate);
-    window.addEventListener("forge:export-png", this.handleExportPNG);
+    window.addEventListener("forge:export-project", this.handleExport as any);
+    window.addEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
   }
+
+  /**
+   * Handles a request for an export preview, generating a dataURL and calling the provided callback.
+   */
+  private handleRequestExportPreview = async (e: any) => {
+    const { format, quality, callback } = e.detail;
+    if (this.project) {
+      const dataURL = await this.exportProject(format, quality);
+      callback(dataURL);
+    }
+  };
 
   /**
    * Handles keyboard release events to track modifier keys.
@@ -839,7 +854,8 @@ export class ForgeEngine {
     window.removeEventListener("forge:select-clear", this.handleClearSelection);
     window.removeEventListener("forge:select-all", this.handleSelectAll);
     window.removeEventListener("forge:duplicate-layer", this.handleDuplicate);
-    window.removeEventListener("forge:export-png", this.handleExportPNG);
+    window.removeEventListener("forge:export-project", this.handleExport as any);
+    window.removeEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
     window.removeEventListener("forge:zoom-to", this.handleZoomTo as any);
 
     // if (this.unsubscribeToolStore) {
@@ -1680,9 +1696,9 @@ export class ForgeEngine {
   }
 
   /**
-   * Exports the project to a PNG data URL.
+   * Exports the project to a data URL with specific format and quality.
    */
-  public async exportToPNG(): Promise<string> {
+  public async exportProject(format: string = "image/png", quality: number = 1): Promise<string> {
     if (!this.project) return "";
 
     const exportCanvas = document.createElement("canvas");
@@ -1691,8 +1707,12 @@ export class ForgeEngine {
     const exportCtx = exportCanvas.getContext("2d")!;
     exportCtx.imageSmoothingEnabled = false;
 
-    // Background white (optional, but requested format is PNG which supports transparency)
-    // If user wants transparency, we just leave it.
+    // Fill background with white for JPEG exports if they don't have a background layer
+    // (JPEG doesn't support transparency)
+    if (format === "image/jpeg") {
+      exportCtx.fillStyle = "#FFFFFF";
+      exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    }
 
     for (const layer of this.project.layers) {
       if (layer.visible) {
@@ -1700,6 +1720,12 @@ export class ForgeEngine {
       }
     }
 
-    return exportCanvas.toDataURL("image/png");
+    if (format === "image/png" && quality < 1) {
+      const imageData = exportCtx.getImageData(0, 0, exportCanvas.width, exportCanvas.height);
+      quantizeImageData(imageData, quality);
+      exportCtx.putImageData(imageData, 0, 0);
+    }
+
+    return exportCanvas.toDataURL(format, quality);
   }
 }

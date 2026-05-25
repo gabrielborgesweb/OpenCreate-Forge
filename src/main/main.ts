@@ -90,10 +90,10 @@ function createMenu(hasProject = false) {
         },
         { type: "separator" },
         {
-          label: "Export as PNG...",
+          label: "Export...",
           accelerator: "CmdOrCtrl+E",
           enabled: hasProject,
-          click: () => win?.webContents.send("menu:action", "export-png"),
+          click: () => win?.webContents.send("menu:action", "open-export-modal"),
         },
         { type: "separator" },
         {
@@ -317,11 +317,11 @@ app.whenReady().then(() => {
     createMenu(hasProject);
   });
 
-  ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName }) => {
+  ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName, filters }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: "Export image",
       defaultPath: defaultName || "export.png",
-      filters: [
+      filters: filters || [
         { name: "PNG", extensions: ["png"] },
         { name: "JPEG", extensions: ["jpg", "jpeg"] },
       ],

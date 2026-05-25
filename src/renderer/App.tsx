@@ -11,6 +11,7 @@ import ToolOptions from "./components/ToolOptions";
 import ProjectTabs from "./components/ProjectTabs";
 import HomeScreen from "./components/HomeScreen";
 import NewProject from "./components/modals/NewProject";
+import ExportModal from "./components/modals/ExportModal";
 import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
 import { useMenuHandler } from "./hooks/useMenuHandler";
@@ -27,6 +28,7 @@ function App() {
   }, [initializeStore]);
 
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!(window as any).electronAPI) return;
@@ -196,8 +198,15 @@ function App() {
 
   React.useEffect(() => {
     const handleNewProject = () => setIsNewProjectModalOpen(true);
+    const handleOpenExportModal = () => setIsExportModalOpen(true);
+
     window.addEventListener("forge:new-project", handleNewProject);
-    return () => window.removeEventListener("forge:new-project", handleNewProject);
+    window.addEventListener("forge:open-export-modal", handleOpenExportModal);
+
+    return () => {
+      window.removeEventListener("forge:new-project", handleNewProject);
+      window.removeEventListener("forge:open-export-modal", handleOpenExportModal);
+    };
   }, []);
 
   return (
@@ -205,6 +214,7 @@ function App() {
       <Toast />
 
       <NewProject isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
+      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} />
 
       {/* 1. Project Tabs */}
       <ProjectTabs />

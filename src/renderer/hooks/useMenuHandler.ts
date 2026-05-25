@@ -138,9 +138,9 @@ export const useMenuHandler = () => {
           }
           break;
 
-        case "export-png":
+        case "open-export-modal":
           if (!activeProject) return;
-          window.dispatchEvent(new CustomEvent("forge:export-png"));
+          window.dispatchEvent(new CustomEvent("forge:open-export-modal"));
           break;
 
         case "undo":
