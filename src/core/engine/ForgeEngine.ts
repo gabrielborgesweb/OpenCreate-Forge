@@ -277,7 +277,12 @@ export class ForgeEngine {
       };
       const format = formatMap[ext] || "image/png";
 
-      const dataURL = await this.exportProject(format, 1.0, this.project.width, this.project.height);
+      const dataURL = await this.exportProject(
+        format,
+        1.0,
+        this.project.width,
+        this.project.height,
+      );
 
       if ((window as any).electronAPI) {
         const result = await (window as any).electronAPI.saveImage({
@@ -342,7 +347,8 @@ export class ForgeEngine {
 
     // Do not trigger global shortcuts if the user is typing in an input
     const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      return;
 
     this.isCtrlPressed = e.ctrlKey || e.metaKey;
 
@@ -548,7 +554,7 @@ export class ForgeEngine {
           const text = await textBlob.text();
           try {
             const metadata = JSON.parse(text);
-            if (metadata.source === "forge-editor") {
+            if (metadata.source === "forge-editor" && metadata.projectId === this.project.id) {
               pasteX = metadata.x;
               pasteY = metadata.y;
             }
