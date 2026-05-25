@@ -53,26 +53,87 @@ export function getOptimizedBoundingBox(
 
 /**
  * Reduces the number of colors in ImageData based on quality (0-1).
- * Simulates PNG color palette reduction (quantization).
+ * Uses a Popularity Palette algorithm to find the most frequent colors,
+ * then maps pixels to this palette for better visual fidelity.
  */
 export function quantizeImageData(imageData: ImageData, quality: number) {
   if (quality >= 1) return imageData;
 
   const data = imageData.data;
-  // quality 1.0 -> 8 bits per channel (256 levels)
-  // quality 0.1 -> 1 bit per channel (2 levels)
-  // Linear mapping for simplicity, but could be adjusted for better "feel"
-  const bitsPerChannel = Math.max(1, Math.min(8, Math.round(1 + quality * 7)));
-  const levels = Math.pow(2, bitsPerChannel);
-  const factor = 255 / (levels - 1);
+  // quality 0.1 -> ~8 colors | quality 0.9 -> ~256 colors
+  const maxColors = Math.max(2, Math.floor(quality * 256));
 
+  // Step 1: Count color frequency (subsampling for performance)
+  const colorMap = new Map<number, number>();
+  // Subsample large images to avoid freezing the main thread
+  const step = data.length > 1000000 ? 16 : 4;
+
+  for (let i = 0; i < data.length; i += step) {
+    const r = Math.round(data[i] / 8) * 8; // Slight grouping to group similar colors
+    const g = Math.round(data[i + 1] / 8) * 8;
+    const b = Math.round(data[i + 2] / 8) * 8;
+    // Pack RGB into a single 24-bit integer for the Map key
+    const rgb = (r << 16) | (g << 8) | b;
+
+    colorMap.set(rgb, (colorMap.get(rgb) || 0) + 1);
+  }
+
+  // Step 2: Sort by frequency and extract the top N colors for our Palette
+  const sortedColors = Array.from(colorMap.entries()).sort((a, b) => b[1] - a[1]);
+  const palette = sortedColors.slice(0, maxColors).map((entry) => {
+    const rgb = entry[0];
+    return {
+      r: (rgb >> 16) & 255,
+      g: (rgb >> 8) & 255,
+      b: rgb & 255,
+    };
+  });
+
+  // Step 3: Map every pixel in the image to the nearest color in our new Palette
   for (let i = 0; i < data.length; i += 4) {
-    // Quantize R, G, B channels
-    data[i] = Math.round(Math.round(data[i] / factor) * factor);
-    data[i + 1] = Math.round(Math.round(data[i + 1] / factor) * factor);
-    data[i + 2] = Math.round(Math.round(data[i + 2] / factor) * factor);
-    // Alpha is usually kept for transparency quality
+    const pr = data[i];
+    const pg = data[i + 1];
+    const pb = data[i + 2];
+
+    let minDistance = Infinity;
+    let closestColor = palette[0];
+
+    // Find the closest color in the palette using Euclidean distance
+    for (const color of palette) {
+      const dist =
+        (pr - color.r) * (pr - color.r) +
+        (pg - color.g) * (pg - color.g) +
+        (pb - color.b) * (pb - color.b);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestColor = color;
+      }
+    }
+
+    data[i] = closestColor.r;
+    data[i + 1] = closestColor.g;
+    data[i + 2] = closestColor.b;
+    // Alpha remains unchanged
   }
 
   return imageData;
+}
+
+/**
+ * Safely converts an ArrayBuffer to a Base64 string without causing
+ * 'Maximum call stack size exceeded' errors on large files.
+ */
+export function safeBase64FromBuffer(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const len = bytes.byteLength;
+  const chunkSize = 8192; // Process in chunks to avoid stack limits
+
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+
+  return btoa(binary);
 }

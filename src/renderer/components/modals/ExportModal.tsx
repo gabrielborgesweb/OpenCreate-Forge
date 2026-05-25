@@ -325,7 +325,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <input
                   type="range"
-                  min="1"
+                  min="0"
                   max="100"
                   value={quality}
                   onChange={(e) => setQuality(parseInt(e.target.value))}

@@ -13,7 +13,12 @@ import { CropTool } from "../tools/CropTool";
 import { TextTool } from "../tools/TextTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useUIStore } from "@/renderer/store/uiStore";
-import { getOptimizedBoundingBox, quantizeImageData } from "../utils/imageUtils";
+import UPNG from "upng-js";
+import {
+  getOptimizedBoundingBox,
+  // quantizeImageData,
+  safeBase64FromBuffer,
+} from "../utils/imageUtils";
 import { RasterLayer } from "../layers/RasterLayer";
 import { TextLayer } from "../layers/TextLayer";
 import { GroupLayer } from "../layers/GroupLayer";
@@ -141,7 +146,9 @@ export class ForgeEngine {
           filters,
         });
         if (result.success) {
-          useUIStore.getState().showToast(`Project exported as ${format.split("/")[1].toUpperCase()}`, "info");
+          useUIStore
+            .getState()
+            .showToast(`Project exported as ${format.split("/")[1].toUpperCase()}`, "info");
         }
       }
     }
@@ -855,7 +862,10 @@ export class ForgeEngine {
     window.removeEventListener("forge:select-all", this.handleSelectAll);
     window.removeEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.removeEventListener("forge:export-project", this.handleExport as any);
-    window.removeEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
+    window.removeEventListener(
+      "forge:request-export-preview",
+      this.handleRequestExportPreview as any,
+    );
     window.removeEventListener("forge:zoom-to", this.handleZoomTo as any);
 
     // if (this.unsubscribeToolStore) {
@@ -1395,7 +1405,13 @@ export class ForgeEngine {
           );
           break;
         case "text":
-          TextLayer.render(ctx, renderLayerTarget, this.layerCanvasCache, this.layerReadyCache, editingState);
+          TextLayer.render(
+            ctx,
+            renderLayerTarget,
+            this.layerCanvasCache,
+            this.layerReadyCache,
+            editingState,
+          );
           break;
         case "group":
           GroupLayer.render(ctx, renderLayerTarget);
@@ -1721,9 +1737,25 @@ export class ForgeEngine {
     }
 
     if (format === "image/png" && quality < 1) {
+      // 1. Pega os pixels originais e INTACTOS
       const imageData = exportCtx.getImageData(0, 0, exportCanvas.width, exportCanvas.height);
-      quantizeImageData(imageData, quality);
-      exportCtx.putImageData(imageData, 0, 0);
+
+      // 2. Calcula o número de cores usando uma curva exponencial.
+      // - 1: 3 cores (muito agressivo, quase posterização)
+      // - 0.5: ~50 cores (redução significativa, mas ainda reconhecível)
+      // - 0.25: ~150 cores (redução leve, boa para fotos)
+      const numColors = 3 + Math.floor(253 * Math.pow(quality, 1));
+
+      // 3. Deixa o UPNG fazer a magia dele com os dados puros
+      const encoded = UPNG.encode(
+        [imageData.data.buffer],
+        imageData.width,
+        imageData.height,
+        numColors,
+      );
+
+      const base64 = safeBase64FromBuffer(encoded);
+      return `data:image/png;base64,${base64}`;
     }
 
     return exportCanvas.toDataURL(format, quality);

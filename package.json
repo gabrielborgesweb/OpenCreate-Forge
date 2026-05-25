@@ -26,6 +26,7 @@
     "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "upng-js": "^2.1.0",
     "wasm-vips": "^0.0.14",
     "zustand": "^5.0.12"
   },
