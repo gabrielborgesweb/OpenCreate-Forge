@@ -237,10 +237,19 @@ export const getSerializableProject = (project: Project): any => {
   const historyLimit = usePreferencesStore.getState().historyLimit;
 
   // We keep the history but limit it to avoid massive files due to Base64 data duplication.
-  const persistedUndoStack = saveHistory ? undoStack.slice(-historyLimit) : [undoStack[0]];
+  const persistedUndoStack = saveHistory ? undoStack.slice(-historyLimit) : [];
+  
+  // Strip text history if saveHistory is off
+  const processedLayers = saveHistory
+    ? rest.layers
+    : rest.layers.map((layer) => {
+        const { textUndoStack: _textUndoStack, textRedoStack: _textRedoStack, ...layerRest } = layer;
+        return layerRest;
+      });
 
   return {
     ...rest,
+    layers: processedLayers,
     undoStack: persistedUndoStack,
     redoStack: [], // Redo stack is typically not persisted across sessions
     updatedAt: new Date().toISOString(),
@@ -270,7 +279,29 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       }
 
       const initialState = createHistoryState(project);
-      const description = project.undoStack?.[0]?.description || "Initial State";
+
+      let finalUndoStack = project.undoStack || [];
+      if (finalUndoStack.length === 0) {
+        const description = project.filePath ? "Open Project" : "Initial State";
+        finalUndoStack = [{ description, state: initialState }];
+      } else {
+        // If it's an existing project being opened, ensure the base item is "Open Project"
+        // and that it has a valid state (populating it if empty)
+        if (project.filePath) {
+          const firstItem = finalUndoStack[0];
+          if (firstItem.description === "Initial State" || firstItem.description === "New Project") {
+            firstItem.description = "Open Project";
+          }
+        }
+
+        if (
+          finalUndoStack.length === 1 &&
+          (!finalUndoStack[0].state || Object.keys(finalUndoStack[0].state).length === 0)
+        ) {
+          finalUndoStack = [{ ...finalUndoStack[0], state: initialState }];
+        }
+      }
+
       const now = new Date().toISOString();
       return {
         projects: [
@@ -280,9 +311,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
             version: project.version || state.appVersion,
             createdAt: project.createdAt || now,
             updatedAt: project.updatedAt || now,
-            undoStack: project.undoStack?.length
-              ? project.undoStack
-              : [{ description, state: initialState }],
+            undoStack: finalUndoStack,
             redoStack: project.redoStack || [],
           },
         ],
