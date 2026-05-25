@@ -18,9 +18,19 @@ export const useAutosave = (): void => {
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const isDirty = activeProject?.isDirty;
+  const filePath = activeProject?.filePath;
 
   useEffect(() => {
-    if (!autosave || !activeProjectId || !isDirty) return;
+    // console.log("useAutosave effect triggered", {
+    //   autosave,
+    //   autosaveInterval,
+    //   activeProjectId,
+    //   isDirty,
+    //   filePath,
+    // });
+    // console.log("Active project details", activeProject);
+
+    if (!autosave || !activeProjectId || !isDirty || !filePath) return;
 
     // Convert minutes to milliseconds
     const intervalMs = autosaveInterval * 60 * 1000;
@@ -30,5 +40,5 @@ export const useAutosave = (): void => {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [autosave, autosaveInterval, activeProjectId, isDirty]);
+  }, [autosave, autosaveInterval, activeProjectId, isDirty, filePath]);
 };
