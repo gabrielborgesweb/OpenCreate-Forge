@@ -388,7 +388,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
               </div>
 
               {/* Dimensions Section */}
-              <div className="space-y-2">
+              <div className="flex flex-col gap-1.5">
                 <label className="text-[0.75rem] text-[#999] font-medium">Export Size</label>
                 <div className="flex items-center gap-1">
                   <div className="flex-1 flex flex-col gap-1">
