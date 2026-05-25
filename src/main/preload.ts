@@ -1,13 +1,15 @@
 /**
  * Purpose: Preload script that exposes Electron APIs and IPC communication to the renderer process in a secure way.
  */
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   openFile: () => ipcRenderer.invoke("dialog:openFile"),
   saveFile: (data: any) => ipcRenderer.invoke("dialog:saveFile", data),
   saveProjectAs: (data: any) => ipcRenderer.invoke("dialog:saveProjectAs", data),
   saveProject: (data: any) => ipcRenderer.invoke("fs:saveProject", data),
+  saveImage: (data: any) => ipcRenderer.invoke("fs:saveImage", data),
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   confirmClose: (projectName: string) => ipcRenderer.invoke("dialog:confirmClose", projectName),
   openProject: () => ipcRenderer.invoke("dialog:openProject"),
   getAppVersion: () => ipcRenderer.invoke("app:getVersion"),

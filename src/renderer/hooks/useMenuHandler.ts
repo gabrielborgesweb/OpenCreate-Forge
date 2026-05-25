@@ -86,6 +86,17 @@ export const useMenuHandler = () => {
         case "save-project":
           if (!activeProject) return;
           if (activeProject.filePath) {
+            const isImage = /\.(png|jpg|jpeg|webp|bmp)$/i.test(activeProject.filePath);
+
+            if (isImage) {
+              window.dispatchEvent(
+                new CustomEvent("forge:save-image", {
+                  detail: { filePath: activeProject.filePath },
+                }),
+              );
+              return;
+            }
+
             try {
               const appVersion = await (window as any).electronAPI.getAppVersion();
               const serializableProject = getSerializableProject(activeProject);
@@ -125,9 +136,11 @@ export const useMenuHandler = () => {
             const serializableProject = getSerializableProject(activeProject);
             const jsonString = JSON.stringify({ ...serializableProject, version: appVersion });
 
+            const isImage = activeProject.filePath && /\.(png|jpg|jpeg|webp|bmp)$/i.test(activeProject.filePath);
+
             const result = await (window as any).electronAPI.saveProjectAs({
               jsonString,
-              defaultName: `${activeProject.name}.ocfd`,
+              defaultName: isImage ? activeProject.name : `${activeProject.name}.ocfd`,
             });
             if (result.success) {
               updateProject(activeProject.id, {

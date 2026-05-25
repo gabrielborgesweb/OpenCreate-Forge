@@ -386,6 +386,21 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("fs:saveImage", async (_event, { dataURL, filePath }) => {
+    if (!filePath) return { success: false, error: "No file path provided." };
+
+    const matches = dataURL.match(/^data:(.+);base64,(.+)$/);
+    if (!matches) return { success: false, error: "Invalid dataURL format" };
+
+    const buffer = Buffer.from(matches[2], "base64");
+    try {
+      await fs.writeFile(filePath, buffer);
+      return { success: true, filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.handle("dialog:confirmClose", async (_event, projectName) => {
     const { response } = await dialog.showMessageBox({
       type: "question",

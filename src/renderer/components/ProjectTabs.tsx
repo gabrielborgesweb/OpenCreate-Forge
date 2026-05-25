@@ -116,7 +116,9 @@ const ProjectTabs: React.FC = () => {
           onClick={() => handleTabClick(project.id)}
         >
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {project.name}.ocfd
+            {project.filePath
+              ? project.filePath.split(/[\\/]/).pop()
+              : `${project.name}.ocfd`}
           </span>
           <div
             tabIndex={-1}

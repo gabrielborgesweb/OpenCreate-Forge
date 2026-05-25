@@ -256,9 +256,44 @@ export class ForgeEngine {
     window.addEventListener("forge:select-all", this.handleSelectAll);
     window.addEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.addEventListener("forge:export-project", this.handleExport as any);
+    window.addEventListener("forge:save-image", this.handleSaveImage as any);
     window.addEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
   }
+
+  /**
+   * Handles direct image saving (Ctrl+S) for image-based projects.
+   */
+  private handleSaveImage = async (e: any) => {
+    const { filePath } = e.detail || {};
+
+    if (this.project && filePath) {
+      const ext = filePath.split(".").pop().toLowerCase() || "";
+      const formatMap: Record<string, string> = {
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        bmp: "image/bmp",
+      };
+      const format = formatMap[ext] || "image/png";
+
+      const dataURL = await this.exportProject(format, 1.0, this.project.width, this.project.height);
+
+      if ((window as any).electronAPI) {
+        const result = await (window as any).electronAPI.saveImage({
+          dataURL,
+          filePath,
+        });
+
+        if (result.success) {
+          useProjectStore.getState().updateProject(this.project.id, { isDirty: false });
+          useUIStore.getState().showToast("Image saved successfully", "info");
+        } else {
+          useUIStore.getState().showToast(`Failed to save image: ${result.error}`, "error");
+        }
+      }
+    }
+  };
 
   /**
    * Handles a request for an export preview, generating a dataURL and calling the provided callback.
@@ -869,6 +904,7 @@ export class ForgeEngine {
     window.removeEventListener("forge:select-all", this.handleSelectAll);
     window.removeEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.removeEventListener("forge:export-project", this.handleExport as any);
+    window.removeEventListener("forge:save-image", this.handleSaveImage as any);
     window.removeEventListener(
       "forge:request-export-preview",
       this.handleRequestExportPreview as any,

@@ -48,8 +48,8 @@ const HomeScreen: React.FC = () => {
   // };
 
   const handleCreateFromImage = useCallback(
-    (dataUrl: string, width: number, height: number, name: string) => {
-      const newProject = createProjectFromImage(dataUrl, width, height, name);
+    (dataUrl: string, width: number, height: number, name: string, filePath?: string) => {
+      const newProject = createProjectFromImage(dataUrl, width, height, name, filePath);
       addProject(newProject);
       setActiveTab(newProject.id);
     },
@@ -119,8 +119,8 @@ const HomeScreen: React.FC = () => {
             const content = event.target?.result as string;
             const projectData = JSON.parse(content);
 
-            // In Electron, File objects have a 'path' property
-            projectData.filePath = (file as any).path;
+            // In Electron, File objects path should be retrieved via webUtils (exposed as getPathForFile)
+            projectData.filePath = (window as any).electronAPI.getPathForFile(file);
             projectData.isDirty = false;
 
             addProject(projectData);
@@ -139,11 +139,13 @@ const HomeScreen: React.FC = () => {
           const dataUrl = event.target?.result as string;
           try {
             const img = await loadImage(dataUrl);
+            const filePath = (window as any).electronAPI.getPathForFile(file);
             handleCreateFromImage(
               dataUrl,
               img.naturalWidth,
               img.naturalHeight,
               file.name.replace(/\.[^/.]+$/, ""),
+              filePath,
             );
           } catch (err) {
             console.error("Failed to load dropped image", err);
