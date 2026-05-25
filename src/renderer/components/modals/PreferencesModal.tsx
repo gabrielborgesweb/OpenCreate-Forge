@@ -97,7 +97,6 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onCl
   const showToast = useUIStore((state) => state.showToast);
 
   // Local state to support Apply/Cancel conventions
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [localTheme, setLocalTheme] = useState<"dark" | "light" | "auto">(preferences.theme);
   const [localAutosave, setLocalAutosave] = useState(preferences.autosave);
   const [localAutosaveInterval, setLocalAutosaveInterval] = useState(preferences.autosaveInterval);
