@@ -112,13 +112,13 @@ function createMenu(hasProject = false) {
         {
           label: "Undo",
           accelerator: "CmdOrCtrl+Z",
-          enabled: hasProject,
+          enabled: true,
           click: () => win?.webContents.send("menu:action", "undo"),
         },
         {
           label: "Redo",
           accelerator: "CmdOrCtrl+Shift+Z",
-          enabled: hasProject,
+          enabled: true,
           click: () => win?.webContents.send("menu:action", "redo"),
         },
         { type: "separator" },
@@ -164,7 +164,7 @@ function createMenu(hasProject = false) {
         {
           label: "All",
           accelerator: "CmdOrCtrl+A",
-          enabled: hasProject,
+          enabled: true,
           click: () => win?.webContents.send("menu:action", "select-all"),
         },
         {

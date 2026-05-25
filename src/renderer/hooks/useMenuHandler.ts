@@ -27,6 +27,18 @@ export const useMenuHandler = () => {
     if (!(window as any).electronAPI) return;
 
     const handleAction = async (action: string) => {
+      const isInputFocused =
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA" ||
+        (document.activeElement as HTMLElement)?.isContentEditable;
+
+      const isModalOpen = useUIStore.getState().isAnyModalOpen();
+
+      // Guard all other actions if a modal is open, except standard edit operations
+      if (isModalOpen && action !== "select-all" && action !== "undo" && action !== "redo") {
+        return;
+      }
+
       switch (action) {
         case "new-project":
           window.dispatchEvent(new CustomEvent("forge:new-project"));
@@ -144,31 +156,45 @@ export const useMenuHandler = () => {
           break;
 
         case "undo":
-          if (activeProjectId) undo(activeProjectId);
+          if (isInputFocused) {
+            try {
+              document.execCommand("undo");
+            } catch (e) {
+              console.warn("execCommand undo failed:", e);
+            }
+          } else if (activeProjectId) {
+            undo(activeProjectId);
+          }
           break;
 
         case "redo":
-          if (activeProjectId) redo(activeProjectId);
+          if (isInputFocused) {
+            try {
+              document.execCommand("redo");
+            } catch (e) {
+              console.warn("execCommand redo failed:", e);
+            }
+          } else if (activeProjectId) {
+            redo(activeProjectId);
+          }
           break;
 
         case "add-layer":
-          if (activeProjectId) {
+          if (activeProjectId && !isInputFocused) {
             addLayer(activeProjectId, { type: "raster" });
           }
           break;
 
         case "duplicate-layer":
-          window.dispatchEvent(new CustomEvent("forge:duplicate-layer"));
+          if (!isInputFocused) {
+            window.dispatchEvent(new CustomEvent("forge:duplicate-layer"));
+          }
           break;
 
         case "remove-layer":
           if (activeProjectId && activeProject?.activeLayerId) {
             // Safety: Don't delete layer if typing in an input or textarea
-            if (
-              document.activeElement?.tagName === "INPUT" ||
-              document.activeElement?.tagName === "TEXTAREA" ||
-              (document.activeElement as HTMLElement)?.isContentEditable
-            ) {
+            if (isInputFocused) {
               return;
             }
             removeLayer(activeProjectId, activeProject.activeLayerId);
@@ -184,11 +210,22 @@ export const useMenuHandler = () => {
           break;
 
         case "deselect":
-          window.dispatchEvent(new CustomEvent("forge:select-clear"));
+          if (!isInputFocused) {
+            window.dispatchEvent(new CustomEvent("forge:select-clear"));
+          }
           break;
 
         case "select-all":
-          window.dispatchEvent(new CustomEvent("forge:select-all"));
+          if (isInputFocused) {
+            if (
+              document.activeElement instanceof HTMLInputElement ||
+              document.activeElement instanceof HTMLTextAreaElement
+            ) {
+              document.activeElement.select();
+            }
+          } else {
+            window.dispatchEvent(new CustomEvent("forge:select-all"));
+          }
           break;
 
         case "zoom-in": {
