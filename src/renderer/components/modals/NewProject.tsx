@@ -10,6 +10,7 @@ import BaseModal from "./BaseModal";
 interface NewProjectProps {
   isOpen: boolean;
   onClose: () => void;
+  initialDimensions?: { width: number; height: number };
 }
 
 const presetsData = {
@@ -47,7 +48,7 @@ const presetsData = {
   ],
 };
 
-const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose }) => {
+const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose, initialDimensions }) => {
   const [name, setName] = useState("Untitled");
   const [width, setWidth] = useState(1920);
   const [height, setHeight] = useState(1080);
@@ -117,15 +118,21 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
-        setName("Untitled");
-        setWidth(1920);
-        setHeight(1080);
+        if (initialDimensions) {
+          setWidth(initialDimensions.width);
+          setHeight(initialDimensions.height);
+          setName("Untitled");
+        } else {
+          setName("Untitled");
+          setWidth(1920);
+          setHeight(1080);
+        }
         setBackground("white");
         nameInputRef.current?.focus();
         nameInputRef.current?.select();
       }, 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialDimensions]);
 
   const applyPreset = (w: number, h: number, n: string) => {
     setWidth(w);

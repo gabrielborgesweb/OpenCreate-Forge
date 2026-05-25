@@ -19,6 +19,9 @@ import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
 import { useMenuHandler } from "./hooks/useMenuHandler";
 
+import { getClipboardImageDimensions } from "@utils/clipboardUtils";
+// ... (imports remain)
+
 function App() {
   useMenuHandler();
   useAutosave();
@@ -38,6 +41,7 @@ function App() {
   }, [initializeStore]);
 
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
+  const [newProjectInitialDimensions, setNewProjectInitialDimensions] = React.useState<{ width: number; height: number } | undefined>(undefined);
   const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = React.useState(false);
 
@@ -210,7 +214,11 @@ function App() {
   ]);
 
   React.useEffect(() => {
-    const handleNewProject = () => setIsNewProjectModalOpen(true);
+    const handleNewProject = async () => {
+      const dimensions = await getClipboardImageDimensions();
+      setNewProjectInitialDimensions(dimensions || undefined);
+      setIsNewProjectModalOpen(true);
+    };
     const handleOpenExportModal = () => setIsExportModalOpen(true);
     const handleOpenPreferences = () => setIsPreferencesModalOpen(true);
 
@@ -229,7 +237,11 @@ function App() {
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
 
-      <NewProject isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
+      <NewProject 
+        isOpen={isNewProjectModalOpen} 
+        onClose={() => setIsNewProjectModalOpen(false)} 
+        initialDimensions={newProjectInitialDimensions}
+      />
       <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} />
       <PreferencesModal key={isPreferencesModalOpen ? "open" : "closed"} isOpen={isPreferencesModalOpen} onClose={() => setIsPreferencesModalOpen(false)} />
 
