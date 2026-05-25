@@ -135,6 +135,7 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose }) => {
 
   return (
     <BaseModal
+      id="new-project-modal"
       isOpen={isOpen}
       onClose={onClose}
       title="New Project"

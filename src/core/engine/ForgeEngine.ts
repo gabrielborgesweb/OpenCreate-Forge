@@ -302,6 +302,13 @@ export class ForgeEngine {
    * Handles keyboard press events for shortcuts and tool interactions.
    */
   private handleKeyDown = (e: KeyboardEvent) => {
+    // Check if any modal is open before processing global shortcuts
+    if (useUIStore.getState().isAnyModalOpen()) return;
+
+    // Do not trigger global shortcuts if the user is typing in an input
+    const target = e.target as HTMLElement;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
     this.isCtrlPressed = e.ctrlKey || e.metaKey;
 
     const tool = this.getActiveTool();

@@ -3,6 +3,7 @@
  */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer } from "@/renderer/store/projectStore";
+import { useUIStore } from "@/renderer/store/uiStore";
 
 interface TransformState {
   x: number;
@@ -97,6 +98,17 @@ export class TransformTool extends BaseTool {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    if (useUIStore.getState().isAnyModalOpen()) return;
+
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
       if (this.context) this.apply(this.context);

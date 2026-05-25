@@ -243,6 +243,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <BaseModal
+      id="export-modal"
       isOpen={isOpen}
       onClose={onClose}
       title="Export for Web"

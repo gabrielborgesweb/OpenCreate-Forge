@@ -3,8 +3,10 @@
  */
 import React, { useEffect, useState, useRef } from "react";
 import { X, LucideIcon } from "lucide-react";
+import { useUIStore } from "@store/uiStore";
 
 interface BaseModalProps {
+  id: string;
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -16,6 +18,7 @@ interface BaseModalProps {
 }
 
 const BaseModal: React.FC<BaseModalProps> = ({
+  id,
   isOpen,
   onClose,
   title,
@@ -28,8 +31,15 @@ const BaseModal: React.FC<BaseModalProps> = ({
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const setModalOpen = useUIStore((state) => state.setModalOpen);
 
   // --- State Synchronization during Render ---
+
+  // Track modal open/close in UIStore
+  useEffect(() => {
+    setModalOpen(id, isOpen);
+    return () => setModalOpen(id, false);
+  }, [id, isOpen, setModalOpen]);
 
   // 1. If opened via prop, ensure the component is mounted in the DOM
   if (isOpen && !isRendered) {

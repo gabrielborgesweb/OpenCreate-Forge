@@ -65,6 +65,7 @@ function App() {
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (useUIStore.getState().isAnyModalOpen()) return;
       if (e.key === "Alt") e.preventDefault(); // Prevent app menu focus
 
       // Handle SelectTool modifiers for visual feedback
@@ -155,6 +156,7 @@ function App() {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (useUIStore.getState().isAnyModalOpen()) return;
       if (activeToolId === "select" && originalModeRef.current) {
         if (!e.shiftKey && !e.altKey) {
           if (isInteracting) {

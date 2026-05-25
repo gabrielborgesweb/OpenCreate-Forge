@@ -20,6 +20,7 @@ interface UIState {
   lastExportFormat: string;
   lastExportQuality: number;
   lastLockAspectRatio: boolean;
+  activeModals: Set<string>;
   setActiveTab: (tab: "home" | string) => void;
   removeFromHistory: (tabId: string) => void;
   showToast: (message: string, type?: "info" | "warning" | "error", duration?: number) => void;
@@ -29,6 +30,8 @@ interface UIState {
   setIsSidebarExpanded: (expanded: boolean) => void;
   setShowRulers: (show: boolean) => void;
   setExportSettings: (format: string, quality: number, lockAspectRatio: boolean) => void;
+  setModalOpen: (modalId: string, isOpen: boolean) => void;
+  isAnyModalOpen: () => boolean;
 }
 
 export const useUIStore = create<UIState>()(
@@ -44,6 +47,7 @@ export const useUIStore = create<UIState>()(
       lastExportFormat: "image/png",
       lastExportQuality: 100,
       lastLockAspectRatio: true,
+      activeModals: new Set(),
       setActiveTab: (tab) =>
         set((state) => {
           const newHistory = state.tabHistory.filter((id) => id !== tab);
@@ -76,6 +80,17 @@ export const useUIStore = create<UIState>()(
           lastExportQuality: quality,
           lastLockAspectRatio: lockAspectRatio,
         }),
+      setModalOpen: (modalId, isOpen) =>
+        set((state) => {
+          const newActiveModals = new Set(state.activeModals);
+          if (isOpen) {
+            newActiveModals.add(modalId);
+          } else {
+            newActiveModals.delete(modalId);
+          }
+          return { activeModals: newActiveModals };
+        }),
+      isAnyModalOpen: () => get().activeModals.size > 0,
     }),
     {
       name: "forge-ui-storage",
