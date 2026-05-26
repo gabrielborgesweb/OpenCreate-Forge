@@ -30,31 +30,43 @@ export class RasterLayer {
     // If not in cache and we have data, try to load it
     if (!lCanvas || lCanvas.width !== layer.width || lCanvas.height !== layer.height) {
       if (layer.data) {
-        // Check if we are already loading or have an image
+        // Utility to populate cache from an image element
+        const populateCache = (image: HTMLImageElement) => {
+          if (image.naturalWidth === 0) return null;
+          const cachedCanvas = document.createElement("canvas");
+          cachedCanvas.width = layer.width;
+          cachedCanvas.height = layer.height;
+          const cctx = cachedCanvas.getContext("2d")!;
+          // Use scaling draw if dimensions don't match exactly (though they should)
+          cctx.drawImage(image, 0, 0, layer.width, layer.height);
+          layerCanvasCache.set(layer.id, cachedCanvas);
+          layerReadyCache.set(layer.id, true);
+          return cachedCanvas;
+        };
+
         let img = imageCache.get(layer.data);
         if (!img) {
           img = new Image();
           img.src = layer.data;
           imageCache.set(layer.data, img);
-          img.onload = () => {
-            const cachedCanvas = document.createElement("canvas");
-            cachedCanvas.width = layer.width;
-            cachedCanvas.height = layer.height;
-            const ctx = cachedCanvas.getContext("2d")!;
-            ctx.drawImage(img!, 0, 0);
-            layerCanvasCache.set(layer.id, cachedCanvas);
-            layerReadyCache.set(layer.id, true);
-            onReady();
-          };
+          img.addEventListener(
+            "load",
+            () => {
+              if (populateCache(img!)) onReady();
+            },
+            { once: true },
+          );
         } else if (img.complete) {
-          const cachedCanvas = document.createElement("canvas");
-          cachedCanvas.width = layer.width;
-          cachedCanvas.height = layer.height;
-          const ctx = cachedCanvas.getContext("2d")!;
-          ctx.drawImage(img, 0, 0);
-          layerCanvasCache.set(layer.id, cachedCanvas);
-          layerReadyCache.set(layer.id, true);
-          lCanvas = cachedCanvas;
+          lCanvas = populateCache(img) || undefined;
+        } else {
+          // Already loading, just wait for it
+          img.addEventListener(
+            "load",
+            () => {
+              if (populateCache(img!)) onReady();
+            },
+            { once: true },
+          );
         }
       }
     }

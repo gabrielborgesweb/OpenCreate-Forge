@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 // import { Plus, FolderOpen } from "lucide-react";
-import { useProjectStore } from "@store/projectStore";
+import { useProjectStore, Project } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
 import { useRecentProjectsStore, RecentProject } from "@store/recentProjectsStore";
 import { ShortcutSpan } from "./ui/Global";
@@ -12,6 +12,7 @@ import { getRelativeTime, formatFileSize, formatFullDateTime } from "@utils/date
 import ContextMenu from "./ui/ContextMenu";
 import { FolderOpen, Edit2, ImageDown, Images, Trash, XCircle } from "lucide-react";
 import RenameModal from "./modals/RenameModal";
+import { ForgeEngine } from "@core/engine/ForgeEngine";
 
 const LogoDark = ({ width }: { width: number }) => {
   const originalWidth = 603;
@@ -199,18 +200,42 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleExportRecent = async (recent: RecentProject, toClipboard = false) => {
-    await handleOpenRecent(recent);
-    setTimeout(() => {
-      if (toClipboard) {
-        window.dispatchEvent(new CustomEvent("forge:export-to-clipboard"));
-      } else {
-        window.dispatchEvent(new CustomEvent("forge:open-export-modal"));
+    try {
+      if (!(window as any).electronAPI) return;
+
+      const openResult = await (window as any).electronAPI.openProjectFromPath(recent.filePath);
+      if (!openResult.success) {
+        useUIStore.getState().showToast(`Failed to load project: ${openResult.error}`, "error");
+        return;
       }
-    }, 200);
+
+      const projectData: Project = JSON.parse(openResult.content);
+
+      if (toClipboard) {
+        // Silent copy to clipboard
+        const dummyCanvas = document.createElement("canvas");
+        dummyCanvas.width = 1;
+        dummyCanvas.height = 1;
+        const engine = new ForgeEngine(dummyCanvas, undefined, { headless: true });
+        engine.setProject(projectData);
+        await engine.exportToClipboard();
+        engine.destroy();
+      } else {
+        // Open Export Modal with project data
+        window.dispatchEvent(
+          new CustomEvent("forge:open-export-modal", {
+            detail: { project: projectData },
+          }),
+        );
+      }
+    } catch (err) {
+      console.error("Export error:", err);
+      useUIStore.getState().showToast("Failed to prepare export", "error");
+    }
   };
 
   const handleTrashRecent = async (recent: RecentProject) => {
-    if (!confirm(`Are you sure you want to move "${recent.name}" to Trash?`)) {
+    if (!confirm(`Are you sure you want to move "${recent.name}" to trash?`)) {
       return;
     }
 
@@ -465,7 +490,7 @@ const HomeScreen: React.FC = () => {
               onClick: () => handleExportRecent(contextMenu.project),
             },
             {
-              label: "Copy to Clipboard",
+              label: "Export to Clipboard",
               icon: Images,
               onClick: () => handleExportRecent(contextMenu.project, true),
             },
@@ -473,8 +498,15 @@ const HomeScreen: React.FC = () => {
               label: "Remove from List",
               icon: XCircle,
               danger: true,
-              onClick: () =>
-                useRecentProjectsStore.getState().removeRecentProject(contextMenu.project.id),
+              onClick: () => {
+                if (
+                  confirm(
+                    `Are you sure you want to remove "${contextMenu.project.name}" from the recent list? This will not delete the project file.`,
+                  )
+                ) {
+                  useRecentProjectsStore.getState().removeRecentProject(contextMenu.project.id);
+                }
+              },
             },
             {
               label: "Trash Project",

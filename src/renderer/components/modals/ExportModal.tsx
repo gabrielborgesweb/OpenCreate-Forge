@@ -3,8 +3,9 @@
  * Design follows the NewProjectModal pattern (900x600px, two-column layout).
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useProjectStore } from "@store/projectStore";
+import { useProjectStore, Project } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
+import { ForgeEngine } from "@core/engine/ForgeEngine";
 import {
   Info,
   ZoomIn,
@@ -21,6 +22,7 @@ import BaseModal from "./BaseModal";
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  project?: Project;
 }
 
 const formats = [
@@ -44,12 +46,13 @@ const formats = [
   },
 ];
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, project }) => {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const projects = useProjectStore((state) => state.projects);
-  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const activeProject = project || projects.find((p) => p.id === activeProjectId);
 
   const setExportSettings = useUIStore((state) => state.setExportSettings);
+  const engineRef = useRef<ForgeEngine | null>(null);
 
   // Form State
   const [filename, setFilename] = useState("");
@@ -69,6 +72,24 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
 
   const filenameInputRef = useRef<HTMLInputElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize local engine for headless export if project prop is provided
+  useEffect(() => {
+    if (isOpen && project) {
+      const dummyCanvas = document.createElement("canvas");
+      dummyCanvas.width = 1;
+      dummyCanvas.height = 1;
+      const engine = new ForgeEngine(dummyCanvas, undefined, { headless: true });
+      engine.setProject(project);
+      engineRef.current = engine;
+    }
+    return () => {
+      if (engineRef.current) {
+        engineRef.current.destroy();
+        engineRef.current = null;
+      }
+    };
+  }, [isOpen, project]);
 
   // Initialize form when modal opens
   useEffect(() => {
@@ -97,7 +118,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
         filenameInputRef.current?.select();
       }, 50);
     }
-  }, [isOpen, activeProject]); // Removed lastExportFormat/Quality dependencies
+  }, [isOpen, activeProject]);
 
   // Persist settings when changed
   useEffect(() => {
@@ -111,23 +132,35 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen || !activeProject) return;
 
     const generatePreview = async () => {
-      window.dispatchEvent(
-        new CustomEvent("forge:request-export-preview", {
-          detail: {
-            format: format.value,
-            quality: quality / 100,
-            width: exportWidth,
-            height: exportHeight,
-            callback: (dataUrl: string) => {
-              setPreviewUrl(dataUrl);
-              // Calculate size
-              const base64Length = dataUrl.split(",")[1].length;
-              const sizeInBytes = base64Length * 0.75;
-              setFileSize(sizeInBytes);
+      const finishPreview = (dataUrl: string) => {
+        setPreviewUrl(dataUrl);
+        // Calculate size
+        const base64Length = dataUrl.split(",")[1].length;
+        const sizeInBytes = base64Length * 0.75;
+        setFileSize(sizeInBytes);
+      };
+
+      if (engineRef.current) {
+        const dataUrl = await engineRef.current.exportProject(
+          format.value,
+          quality / 100,
+          exportWidth,
+          exportHeight,
+        );
+        finishPreview(dataUrl);
+      } else {
+        window.dispatchEvent(
+          new CustomEvent("forge:request-export-preview", {
+            detail: {
+              format: format.value,
+              quality: quality / 100,
+              width: exportWidth,
+              height: exportHeight,
+              callback: finishPreview,
             },
-          },
-        }),
-      );
+          }),
+        );
+      }
     };
 
     const timer = setTimeout(generatePreview, 300); // Debounce
@@ -222,19 +255,41 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
     if (!activeProject) return;
 
     const filters = [{ name: format.label, extensions: [format.ext] }];
+    const exportDetail = {
+      format: format.value,
+      quality: quality / 100,
+      filename: `${filename}.${format.ext}`,
+      filters,
+      width: exportWidth,
+      height: exportHeight,
+    };
 
-    await window.dispatchEvent(
-      new CustomEvent("forge:export-project", {
-        detail: {
-          format: format.value,
-          quality: quality / 100,
-          filename: `${filename}.${format.ext}`,
-          filters,
-          width: exportWidth,
-          height: exportHeight,
-        },
-      }),
-    );
+    if (engineRef.current) {
+      const dataURL = await engineRef.current.exportProject(
+        exportDetail.format,
+        exportDetail.quality,
+        exportDetail.width,
+        exportDetail.height,
+      );
+      if ((window as any).electronAPI) {
+        const result = await (window as any).electronAPI.saveFile({
+          dataURL,
+          defaultName: exportDetail.filename,
+          filters: exportDetail.filters,
+        });
+        if (result.success) {
+          useUIStore.getState().showToast("Project exported successfully", "info");
+        } else if (result.error !== "Cancelled") {
+          useUIStore.getState().showToast(`Failed to export: ${result.error}`, "error");
+        }
+      }
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("forge:export-project", {
+          detail: exportDetail,
+        }),
+      );
+    }
 
     onClose();
   };

@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { useUIStore } from "@store/uiStore";
-import { useProjectStore } from "@store/projectStore";
+import { useProjectStore, Project } from "@store/projectStore";
 import CanvasViewport from "./components/CanvasViewport";
 import RightSidebar from "./components/Sidebar/RightSidebar";
 import Toolbar from "./components/Toolbar";
@@ -213,22 +213,27 @@ function App() {
     resetColors,
   ]);
 
+  const [exportProject, setExportProject] = React.useState<Project | null>(null);
+
   React.useEffect(() => {
     const handleNewProject = async () => {
       const dimensions = await getClipboardImageDimensions();
       setNewProjectInitialDimensions(dimensions || undefined);
       setIsNewProjectModalOpen(true);
     };
-    const handleOpenExportModal = () => setIsExportModalOpen(true);
+    const handleOpenExportModal = (e: any) => {
+      setExportProject(e.detail?.project || null);
+      setIsExportModalOpen(true);
+    };
     const handleOpenPreferences = () => setIsPreferencesModalOpen(true);
 
     window.addEventListener("forge:new-project", handleNewProject);
-    window.addEventListener("forge:open-export-modal", handleOpenExportModal);
+    window.addEventListener("forge:open-export-modal", handleOpenExportModal as any);
     window.addEventListener("forge:open-preferences", handleOpenPreferences);
 
     return () => {
       window.removeEventListener("forge:new-project", handleNewProject);
-      window.removeEventListener("forge:open-export-modal", handleOpenExportModal);
+      window.removeEventListener("forge:open-export-modal", handleOpenExportModal as any);
       window.removeEventListener("forge:open-preferences", handleOpenPreferences);
     };
   }, []);
@@ -237,13 +242,19 @@ function App() {
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
 
-      <NewProject 
-        isOpen={isNewProjectModalOpen} 
-        onClose={() => setIsNewProjectModalOpen(false)} 
+      <NewProject
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
         initialDimensions={newProjectInitialDimensions}
       />
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} />
-      <PreferencesModal key={isPreferencesModalOpen ? "open" : "closed"} isOpen={isPreferencesModalOpen} onClose={() => setIsPreferencesModalOpen(false)} />
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => {
+          setIsExportModalOpen(false);
+          setExportProject(null);
+        }}
+        project={exportProject || undefined}
+      />      <PreferencesModal key={isPreferencesModalOpen ? "open" : "closed"} isOpen={isPreferencesModalOpen} onClose={() => setIsPreferencesModalOpen(false)} />
 
       {/* 1. Project Tabs */}
       <ProjectTabs />

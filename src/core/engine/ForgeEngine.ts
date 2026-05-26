@@ -35,6 +35,10 @@ export interface ViewportState {
   originY: number;
 }
 
+export interface EngineOptions {
+  headless?: boolean;
+}
+
 /**
  * Core engine class responsible for project rendering, viewport management (zoom/pan),
  * tool orchestration, and selection handling. It manages the main rendering loop
@@ -44,6 +48,7 @@ export class ForgeEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private project: Project | null = null;
+  private options: EngineOptions;
   private checkerPattern: CanvasPattern | null = null;
 
   private ZOOM_SENSITIVITY = 0.05;
@@ -73,22 +78,25 @@ export class ForgeEngine {
   private projectCtx: CanvasRenderingContext2D;
 
   private currentToolId: string | null = null;
-  private onViewportChange: (zoom: number, x: number, y: number) => void;
+  private onViewportChange?: (zoom: number, x: number, y: number) => void;
 
   // private lastMouseEvent: MouseEvent | null = null;
 
   /**
-   * Initializes the engine with a target canvas and viewport change callback.
+   * Initializes the engine with a target canvas and optional settings.
    * @param canvas The HTML canvas element to render into.
-   * @param onViewportChange Callback fired when zoom or pan changes.
+   * @param onViewportChange Optional callback fired when zoom or pan changes.
+   * @param options Engine configuration options.
    */
   constructor(
     canvas: HTMLCanvasElement,
-    onViewportChange: (zoom: number, x: number, y: number) => void,
+    onViewportChange?: (zoom: number, x: number, y: number) => void,
+    options: EngineOptions = {},
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.onViewportChange = onViewportChange;
+    this.options = options;
 
     this.selectionCanvas = document.createElement("canvas");
     this.selectionCtx = this.selectionCanvas.getContext("2d", {
@@ -116,8 +124,10 @@ export class ForgeEngine {
     this.handleMouseUp = this.handleMouseUp.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
 
-    this.setupEventListeners();
-    this.startRenderLoop();
+    if (!this.options.headless) {
+      this.setupEventListeners();
+      this.startRenderLoop();
+    }
   }
 
   private unsubscribeToolStore: (() => void) | null = null;
@@ -264,6 +274,60 @@ export class ForgeEngine {
   }
 
   /**
+   * Preloads all images and fonts for the project layers.
+   * This is essential for headless mode to ensure everything is ready before rendering.
+   */
+  public async preloadImages(): Promise<void> {
+    if (!this.project) return;
+
+    // 1. Wait for fonts to be ready
+    try {
+      await (document as any).fonts.ready;
+    } catch (e) {
+      console.warn("Font preloading failed", e);
+    }
+
+    // 2. Wait for all raster images to be loaded and decoded
+    const promises = this.project.layers.map(async (layer) => {
+      if (layer.type === "raster" && layer.data) {
+        return new Promise<void>((resolve) => {
+          let img = this.imageCache.get(layer.data!);
+          if (!img) {
+            img = new Image();
+            img.src = layer.data!;
+            this.imageCache.set(layer.data!, img);
+          }
+
+          const onDone = async () => {
+            img?.removeEventListener("load", onDone);
+            img?.removeEventListener("error", onDone);
+            
+            // Wait for decoding to ensure it's ready for canvas drawing
+            try {
+              if (img?.decode) await img.decode();
+            } catch (e) {
+              console.warn("Image decode failed", e);
+            }
+            resolve();
+          };
+
+          if (img.complete && img.naturalWidth > 0) {
+            onDone();
+          } else {
+            img.addEventListener("load", onDone);
+            img.addEventListener("error", onDone);
+            // Safety: if it failed and is complete, naturalWidth will be 0
+            if (img.complete && img.naturalWidth === 0) resolve();
+          }
+        });
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(promises);
+  }
+
+  /**
    * Handles exporting the full project to the clipboard.
    */
   private handleExportToClipboard = async () => {
@@ -276,6 +340,8 @@ export class ForgeEngine {
    */
   public async exportToClipboard() {
     if (!this.project) return;
+
+    await this.preloadImages();
 
     // We avoid fetch(dataURL) due to CSP restrictions in some environments.
     // Instead, we'll manually render the project to a blob.
@@ -379,6 +445,9 @@ export class ForgeEngine {
    */
   public async generateThumbnail(size: number = 150): Promise<string> {
     if (!this.project) return "";
+
+    await this.preloadImages();
+    this.render();
 
     const thumbCanvas = document.createElement("canvas");
     thumbCanvas.width = size;
@@ -891,7 +960,7 @@ export class ForgeEngine {
     this.project.panX = newOriginX;
     this.project.panY = newOriginY;
 
-    this.onViewportChange(newScale, newOriginX, newOriginY);
+    this.onViewportChange?.(newScale, newOriginX, newOriginY);
   }
 
   /**
@@ -962,7 +1031,7 @@ export class ForgeEngine {
       this.project.panX = newPanX;
       this.project.panY = newPanY;
 
-      this.onViewportChange(this.project.zoom, newPanX, newPanY);
+      this.onViewportChange?.(this.project.zoom, newPanX, newPanY);
       return;
     }
 
@@ -995,7 +1064,14 @@ export class ForgeEngine {
   }
 
   /**
-   * Stops the main rendering loop and removes all event listeners.
+   * Completely stops the engine and removes all event listeners.
+   */
+  public destroy() {
+    this.stopRenderLoop();
+  }
+
+  /**
+   * Stops the animation loop and removes event listeners from the canvas and window.
    */
   public stopRenderLoop() {
     if (this.animationFrameId !== null) {
@@ -1272,7 +1348,7 @@ export class ForgeEngine {
     this.project.zoom = scale;
     this.project.panX = originX;
     this.project.panY = originY;
-    this.onViewportChange(scale, originX, originY);
+    this.onViewportChange?.(scale, originX, originY);
   }
 
   /**
@@ -1350,7 +1426,7 @@ export class ForgeEngine {
       this.project.zoom = currentZoom;
       this.project.panX = currentPanX;
       this.project.panY = currentPanY;
-      this.onViewportChange(currentZoom, currentPanX, currentPanY);
+      this.onViewportChange?.(currentZoom, currentPanX, currentPanY);
 
       if (progress < 1) {
         this.viewportAnimationId = requestAnimationFrame(animate);
@@ -1871,6 +1947,8 @@ export class ForgeEngine {
     targetHeight?: number,
   ): Promise<string> {
     if (!this.project) return "";
+
+    await this.preloadImages();
 
     const finalWidth = targetWidth || this.project.width;
     const finalHeight = targetHeight || this.project.height;
