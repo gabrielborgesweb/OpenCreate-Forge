@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   confirmClose: (projectName: string) => ipcRenderer.invoke("dialog:confirmClose", projectName),
   openProject: () => ipcRenderer.invoke("dialog:openProject"),
   openProjectFromPath: (filePath: string) => ipcRenderer.invoke("fs:openProjectFromPath", filePath),
+  deleteFile: (filePath: string) => ipcRenderer.invoke("fs:deleteFile", filePath),
+  renameFile: (data: { oldPath: string; newPath: string }) =>
+    ipcRenderer.invoke("fs:renameFile", data),
   getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
   updateMenu: (data: { hasProject: boolean }) => ipcRenderer.invoke("app:updateMenu", data),
   onProjectDropped: (callback: any) => {

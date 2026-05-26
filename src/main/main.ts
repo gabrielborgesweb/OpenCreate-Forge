@@ -1,7 +1,7 @@
 /**
  * Purpose: Electron main process script that handles window management, native menus, and IPC handlers for file operations and system dialogs.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -446,6 +446,24 @@ app.whenReady().then(() => {
     try {
       const content = await fs.readFile(filePath, "utf8");
       return { success: true, filePath, content };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("fs:deleteFile", async (_event, filePath) => {
+    try {
+      await shell.trashItem(filePath);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("fs:renameFile", async (_event, { oldPath, newPath }) => {
+    try {
+      await fs.rename(oldPath, newPath);
+      return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }

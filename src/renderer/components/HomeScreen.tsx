@@ -9,6 +9,9 @@ import { useRecentProjectsStore, RecentProject } from "@store/recentProjectsStor
 import { ShortcutSpan } from "./ui/Global";
 import { createProjectFromImage, loadImage } from "@utils/projectUtils";
 import { getRelativeTime, formatFileSize, formatFullDateTime } from "@utils/dateUtils";
+import ContextMenu from "./ui/ContextMenu";
+import { FolderOpen, Edit2, ImageDown, Images, Trash, XCircle } from "lucide-react";
+import RenameModal from "./modals/RenameModal";
 
 const LogoDark = ({ width }: { width: number }) => {
   const originalWidth = 603;
@@ -43,10 +46,12 @@ const LogoDark = ({ width }: { width: number }) => {
 const RecentProjectItem: React.FC<{
   project: RecentProject;
   onClick: (project: RecentProject) => void;
-}> = ({ project, onClick }) => {
+  onContextMenu: (e: React.MouseEvent, project: RecentProject) => void;
+}> = ({ project, onClick, onContextMenu }) => {
   return (
     <div
       onClick={() => onClick(project)}
+      onContextMenu={(e) => onContextMenu(e, project)}
       className="flex flex-col gap-2 group cursor-pointer w-[150px] relative before:absolute before:inset-0 before:bg-bg-tertiary before:rounded-xl before:opacity-0 hover:before:opacity-50 hover:before:inset-[-8px] before:transition-all before:pointer-events-none"
     >
       <div className="relative z-1 w-[150px] h-[150px] bg-bg-tertiary rounded overflow-hidden border border-bg-tertiary transition-all group-hover:border-accent">
@@ -81,6 +86,13 @@ const HomeScreen: React.FC = () => {
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const recentProjects = useRecentProjectsStore((state) => state.recentProjects);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<RecentProject | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    project: RecentProject;
+  } | null>(null);
 
   const handleOpenRecent = async (recent: RecentProject) => {
     try {
@@ -108,6 +120,123 @@ const HomeScreen: React.FC = () => {
       console.error("Failed to open recent project", err);
       useUIStore.getState().showToast("Failed to open project", "error");
     }
+  };
+
+  const handleRenameRecent = (recent: RecentProject) => {
+    setProjectToRename(recent);
+    setIsRenameModalOpen(true);
+  };
+
+  const performRename = async (newName: string) => {
+    if (!projectToRename || !newName || newName === projectToRename.name) return;
+    const recent = projectToRename;
+
+    if (!(window as any).electronAPI) return;
+
+    try {
+      // 1. Rename file on disk
+      const oldPath = recent.filePath;
+      const separator = oldPath.includes("/") ? "/" : "\\";
+      const directory = oldPath.substring(0, oldPath.lastIndexOf(separator) + 1);
+      const extension = oldPath.endsWith(".ocfd")
+        ? ".ocfd"
+        : oldPath.substring(oldPath.lastIndexOf("."));
+      const newPath = `${directory}${newName}${extension}`;
+
+      const renameResult = await (window as any).electronAPI.renameFile({
+        oldPath,
+        newPath,
+      });
+
+      if (renameResult.success) {
+        // 2. Load and update internal name (only if it's an .ocfd file)
+        if (extension === ".ocfd") {
+          const openResult = await (window as any).electronAPI.openProjectFromPath(newPath);
+          if (openResult.success) {
+            const projectData = JSON.parse(openResult.content);
+            projectData.name = newName;
+            projectData.updatedAt = new Date().toISOString();
+
+            await (window as any).electronAPI.saveProject({
+              jsonString: JSON.stringify(projectData),
+              filePath: newPath,
+            });
+
+            // Update recent projects store
+            useRecentProjectsStore.getState().addRecentProject({
+              ...recent,
+              name: newName,
+              filePath: newPath,
+              lastModified: projectData.updatedAt,
+            });
+          }
+        } else {
+          // If not .ocfd (e.g. image), just update the recent list
+          useRecentProjectsStore.getState().addRecentProject({
+            ...recent,
+            name: newName,
+            filePath: newPath,
+          });
+        }
+
+        // 3. Synchronize with projectStore if the project is open
+        const openProject = useProjectStore.getState().projects.find((p) => p.filePath === oldPath);
+        if (openProject) {
+          useProjectStore.getState().updateProject(openProject.id, {
+            name: newName,
+            filePath: newPath,
+          });
+        }
+
+        useUIStore.getState().showToast("Project renamed successfully", "info");
+      } else {
+        useUIStore.getState().showToast(`Failed to rename: ${renameResult.error}`, "error");
+      }
+    } catch (err) {
+      console.error("Rename error:", err);
+      useUIStore.getState().showToast("Failed to rename project", "error");
+    }
+  };
+
+  const handleExportRecent = async (recent: RecentProject, toClipboard = false) => {
+    await handleOpenRecent(recent);
+    setTimeout(() => {
+      if (toClipboard) {
+        window.dispatchEvent(new CustomEvent("forge:export-to-clipboard"));
+      } else {
+        window.dispatchEvent(new CustomEvent("forge:open-export-modal"));
+      }
+    }, 200);
+  };
+
+  const handleTrashRecent = async (recent: RecentProject) => {
+    if (!confirm(`Are you sure you want to move "${recent.name}" to Trash?`)) {
+      return;
+    }
+
+    if (!(window as any).electronAPI) return;
+
+    try {
+      const result = await (window as any).electronAPI.deleteFile(recent.filePath);
+      if (result.success) {
+        useRecentProjectsStore.getState().removeRecentProject(recent.id);
+        useUIStore.getState().showToast("Project moved to trash", "info");
+      } else {
+        useUIStore.getState().showToast(`Failed to trash: ${result.error}`, "error");
+      }
+    } catch (err) {
+      console.error("Trash error:", err);
+      useUIStore.getState().showToast("Failed to trash project", "error");
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, project: RecentProject) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      project,
+    });
   };
 
   const handleCreateFromImage = useCallback(
@@ -303,11 +432,68 @@ const HomeScreen: React.FC = () => {
           </h2>
           <div className="grid grid-cols-5 gap-6">
             {recentProjects.map((project) => (
-              <RecentProjectItem key={project.id} project={project} onClick={handleOpenRecent} />
+              <RecentProjectItem
+                key={project.id}
+                project={project}
+                onClick={handleOpenRecent}
+                onContextMenu={handleContextMenu}
+              />
             ))}
           </div>
         </div>
       )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: "Open Project",
+              icon: FolderOpen,
+              onClick: () => handleOpenRecent(contextMenu.project),
+            },
+            {
+              label: "Rename...",
+              icon: Edit2,
+              onClick: () => handleRenameRecent(contextMenu.project),
+            },
+            {
+              label: "Export...",
+              icon: ImageDown,
+              onClick: () => handleExportRecent(contextMenu.project),
+            },
+            {
+              label: "Copy to Clipboard",
+              icon: Images,
+              onClick: () => handleExportRecent(contextMenu.project, true),
+            },
+            {
+              label: "Remove from List",
+              icon: XCircle,
+              danger: true,
+              onClick: () =>
+                useRecentProjectsStore.getState().removeRecentProject(contextMenu.project.id),
+            },
+            {
+              label: "Trash Project",
+              icon: Trash,
+              danger: true,
+              onClick: () => handleTrashRecent(contextMenu.project),
+            },
+          ]}
+        />
+      )}
+
+      <RenameModal
+        key={projectToRename ? projectToRename.id : "none"}
+        isOpen={isRenameModalOpen}
+        onClose={() => setIsRenameModalOpen(false)}
+        onRename={performRename}
+        initialValue={projectToRename?.name || ""}
+        title="Rename Project"
+      />
 
       {/* <div className="flex gap-6">
         <button
