@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   confirmClose: (projectName: string) => ipcRenderer.invoke("dialog:confirmClose", projectName),
   openProject: () => ipcRenderer.invoke("dialog:openProject"),
+  openProjectFromPath: (filePath: string) => ipcRenderer.invoke("fs:openProjectFromPath", filePath),
   getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
   updateMenu: (data: { hasProject: boolean }) => ipcRenderer.invoke("app:updateMenu", data),
   onProjectDropped: (callback: any) => {

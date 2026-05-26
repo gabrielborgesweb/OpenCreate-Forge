@@ -5,8 +5,10 @@ import React, { useState, useEffect, useCallback } from "react";
 // import { Plus, FolderOpen } from "lucide-react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
+import { useRecentProjectsStore, RecentProject } from "@store/recentProjectsStore";
 import { ShortcutSpan } from "./ui/Global";
 import { createProjectFromImage, loadImage } from "@utils/projectUtils";
+import { getRelativeTime, formatFileSize, formatFullDateTime } from "@utils/dateUtils";
 
 const LogoDark = ({ width }: { width: number }) => {
   const originalWidth = 603;
@@ -38,14 +40,75 @@ const LogoDark = ({ width }: { width: number }) => {
   );
 };
 
+const RecentProjectItem: React.FC<{
+  project: RecentProject;
+  onClick: (project: RecentProject) => void;
+}> = ({ project, onClick }) => {
+  return (
+    <div
+      onClick={() => onClick(project)}
+      className="flex flex-col gap-2 group cursor-pointer w-[150px] relative before:absolute before:inset-0 before:bg-bg-tertiary before:rounded-xl before:opacity-0 hover:before:opacity-50 hover:before:inset-[-8px] before:transition-all before:pointer-events-none"
+    >
+      <div className="relative z-1 w-[150px] h-[150px] bg-bg-tertiary rounded overflow-hidden border border-bg-tertiary transition-all group-hover:border-accent">
+        {project.thumbnail ? (
+          <img src={project.thumbnail} alt={project.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-bg-quaternary">
+            No Preview
+          </div>
+        )}
+      </div>
+      <div className="relative z-1 flex flex-col">
+        <span
+          className="text-[0.85rem] font-medium truncate group-hover:text-accent transition-colors"
+          title={project.filePath}
+        >
+          {project.name}
+        </span>
+        <div className="flex justify-between items-center text-[0.7rem] text-text-secondary">
+          <span title={formatFullDateTime(project.lastModified)}>
+            {getRelativeTime(project.lastModified)}
+          </span>
+          <span>{formatFileSize(project.fileSize)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HomeScreen: React.FC = () => {
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const recentProjects = useRecentProjectsStore((state) => state.recentProjects);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // const handleNewProjectClick = () => {
-  //   window.dispatchEvent(new CustomEvent("forge:new-project"));
-  // };
+  const handleOpenRecent = async (recent: RecentProject) => {
+    try {
+      // We need to read the file from disk
+      if (!(window as any).electronAPI) return;
+
+      const result = await (window as any).electronAPI.openProjectFromPath(recent.filePath);
+      if (result && result.success) {
+        const projectData = JSON.parse(result.content);
+        projectData.filePath = recent.filePath;
+        projectData.isDirty = false;
+
+        addProject(projectData);
+        setActiveTab(projectData.id);
+        useUIStore.getState().showToast("Project opened successfully", "info");
+      } else {
+        useUIStore
+          .getState()
+          .showToast(
+            "Could not open recent project. It might have been moved or deleted.",
+            "error",
+          );
+      }
+    } catch (err) {
+      console.error("Failed to open recent project", err);
+      useUIStore.getState().showToast("Failed to open project", "error");
+    }
+  };
 
   const handleCreateFromImage = useCallback(
     (dataUrl: string, width: number, height: number, name: string, filePath?: string) => {
@@ -200,7 +263,7 @@ const HomeScreen: React.FC = () => {
         </div>
         <div className="border-l border-bg-tertiary h-full" />
         <div className="flex flex-col gap-2">
-          <p className="mb-2">Image Editor powered by React & Electron</p>
+          <p className="mb-2">Free and Open Source Image Editor.</p>
 
           <div className="flex flex-col gap-3">
             <p className="flex items-center gap-1">
@@ -215,6 +278,36 @@ const HomeScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {recentProjects.length > 0 && (
+        <div
+          className="w-full max-w-[800px] mt-8 flex flex-col gap-4 animate-fade-in-up"
+          style={{ animationDelay: "150ms" }}
+        >
+          <h2 className="text-[1rem] font-semibold text-text-secondary border-b border-bg-tertiary pb-2 flex items-center gap-2">
+            Recent Projects
+            <div
+              onClick={() => {
+                if (
+                  confirm(
+                    "Are you sure you want to clear recent projects? This action cannot be undone.",
+                  )
+                ) {
+                  useRecentProjectsStore.getState().clearRecentProjects();
+                }
+              }}
+              className="text-[0.75rem] text-text-secondary hover:text-accent cursor-pointer transition-colors ml-auto"
+            >
+              Clear
+            </div>
+          </h2>
+          <div className="grid grid-cols-5 gap-6">
+            {recentProjects.map((project) => (
+              <RecentProjectItem key={project.id} project={project} onClick={handleOpenRecent} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* <div className="flex gap-6">
         <button

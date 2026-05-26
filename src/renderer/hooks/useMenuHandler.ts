@@ -3,6 +3,7 @@
  */
 import { useEffect } from "react";
 import { useProjectStore, getSerializableProject } from "@store/projectStore";
+import { useRecentProjectsStore } from "@store/recentProjectsStore";
 import { useUIStore } from "@store/uiStore";
 import { createProjectFromImage, loadImage } from "@utils/projectUtils";
 
@@ -20,6 +21,7 @@ export const useMenuHandler = () => {
   const showToast = useUIStore((state) => state.showToast);
   const showRulers = useUIStore((state) => state.showRulers);
   const setShowRulers = useUIStore((state) => state.setShowRulers);
+  const addRecentProject = useRecentProjectsStore((state) => state.addRecentProject);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -109,6 +111,25 @@ export const useMenuHandler = () => {
               if (result.success) {
                 updateProject(activeProject.id, { isDirty: false, version: appVersion });
                 showToast("Project saved", "info");
+
+                // Request thumbnail and update recent projects
+                window.dispatchEvent(
+                  new CustomEvent("forge:request-thumbnail", {
+                    detail: {
+                      callback: (thumbnail: string) => {
+                        addRecentProject({
+                          id: activeProject.id,
+                          name: activeProject.name,
+                          filePath: result.filePath,
+                          thumbnail,
+                          lastModified: result.updatedAt,
+                          fileSize: result.fileSize,
+                        });
+                      },
+                    },
+                  }),
+                );
+
                 window.dispatchEvent(
                   new CustomEvent("forge:save-project-finished", { detail: { success: true } }),
                 );
@@ -150,6 +171,25 @@ export const useMenuHandler = () => {
                 version: appVersion,
               });
               showToast("Project saved", "info");
+
+              // Request thumbnail and update recent projects
+              window.dispatchEvent(
+                new CustomEvent("forge:request-thumbnail", {
+                  detail: {
+                    callback: (thumbnail: string) => {
+                      addRecentProject({
+                        id: activeProject.id,
+                        name: result.name,
+                        filePath: result.filePath,
+                        thumbnail,
+                        lastModified: result.updatedAt,
+                        fileSize: result.fileSize,
+                      });
+                    },
+                  },
+                }),
+              );
+
               window.dispatchEvent(
                 new CustomEvent("forge:save-project-finished", { detail: { success: true } }),
               );
@@ -291,5 +331,6 @@ export const useMenuHandler = () => {
     showToast,
     showRulers,
     setShowRulers,
+    addRecentProject,
   ]);
 };

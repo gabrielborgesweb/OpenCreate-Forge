@@ -258,6 +258,7 @@ export class ForgeEngine {
     window.addEventListener("forge:export-project", this.handleExport as any);
     window.addEventListener("forge:save-image", this.handleSaveImage as any);
     window.addEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
+    window.addEventListener("forge:request-thumbnail", this.handleRequestThumbnail as any);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
   }
 
@@ -310,6 +311,55 @@ export class ForgeEngine {
       callback(dataURL);
     }
   };
+
+  /**
+   * Handles a request for a project thumbnail.
+   */
+  private handleRequestThumbnail = async (e: any) => {
+    const { callback, size = 150 } = e.detail;
+    if (this.project) {
+      const dataURL = await this.generateThumbnail(size);
+      callback(dataURL);
+    }
+  };
+
+  /**
+   * Generates a square thumbnail of the current project.
+   */
+  public async generateThumbnail(size: number = 150): Promise<string> {
+    if (!this.project) return "";
+
+    const thumbCanvas = document.createElement("canvas");
+    thumbCanvas.width = size;
+    thumbCanvas.height = size;
+    const thumbCtx = thumbCanvas.getContext("2d")!;
+    thumbCtx.imageSmoothingEnabled = true;
+
+    // Dark background for the square
+    thumbCtx.fillStyle = "#1a1a1a";
+    thumbCtx.fillRect(0, 0, size, size);
+
+    const projectRatio = this.project.width / this.project.height;
+    let drawW, drawH, drawX, drawY;
+
+    if (projectRatio > 1) {
+      // Landscape: fit to height, crop horizontal
+      drawH = size;
+      drawW = size * projectRatio;
+      drawX = (size - drawW) / 2;
+      drawY = 0;
+    } else {
+      // Portrait or square: fit to width, crop vertical
+      drawW = size;
+      drawH = size / projectRatio;
+      drawX = 0;
+      drawY = (size - drawH) / 2;
+    }
+
+    thumbCtx.drawImage(this.projectBuffer, drawX, drawY, drawW, drawH);
+
+    return thumbCanvas.toDataURL("image/jpeg", 0.8);
+  }
 
   /**
    * Handles keyboard release events to track modifier keys.

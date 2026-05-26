@@ -362,7 +362,15 @@ app.whenReady().then(() => {
       dataToSave.updatedAt = new Date().toISOString();
 
       await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2));
-      return { success: true, filePath, name };
+      const stats = await fs.stat(filePath);
+
+      return {
+        success: true,
+        filePath,
+        name,
+        fileSize: stats.size,
+        updatedAt: dataToSave.updatedAt,
+      };
     } catch (err: any) {
       return { success: false, error: err.message, filePath: null };
     }
@@ -380,7 +388,14 @@ app.whenReady().then(() => {
       dataToSave.updatedAt = new Date().toISOString();
 
       await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2));
-      return { success: true, filePath };
+      const stats = await fs.stat(filePath);
+
+      return {
+        success: true,
+        filePath,
+        fileSize: stats.size,
+        updatedAt: dataToSave.updatedAt,
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -395,7 +410,14 @@ app.whenReady().then(() => {
     const buffer = Buffer.from(matches[2], "base64");
     try {
       await fs.writeFile(filePath, buffer);
-      return { success: true, filePath };
+      const stats = await fs.stat(filePath);
+
+      return {
+        success: true,
+        filePath,
+        fileSize: stats.size,
+        updatedAt: new Date().toISOString(),
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -411,6 +433,16 @@ app.whenReady().then(() => {
       detail: "Your changes will be lost if you don't save them.",
     });
     return response;
+  });
+
+  ipcMain.handle("fs:openProjectFromPath", async (_event, filePath) => {
+    if (!filePath) return { success: false, error: "No file path provided." };
+    try {
+      const content = await fs.readFile(filePath, "utf8");
+      return { success: true, filePath, content };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   });
 
   ipcMain.handle("dialog:openProject", async () => {
