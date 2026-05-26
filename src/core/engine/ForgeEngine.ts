@@ -346,9 +346,9 @@ export class ForgeEngine {
     if (useUIStore.getState().isAnyModalOpen()) return;
 
     // Do not trigger global shortcuts if the user is typing in an input
-    const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      return;
+    // const target = e.target as HTMLElement;
+    // if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+    //   return;
 
     this.isCtrlPressed = e.ctrlKey || e.metaKey;
 
