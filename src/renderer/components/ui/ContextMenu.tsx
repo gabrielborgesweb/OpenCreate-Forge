@@ -1,11 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
-export interface ContextMenuItem {
-  label: string;
-  icon?: React.ElementType;
-  onClick: () => void;
-  danger?: boolean;
-}
+export type ContextMenuItem =
+  | {
+      label: string;
+      icon?: React.ElementType;
+      onClick: () => void;
+      danger?: boolean;
+    }
+  | {
+      isSeparator: true;
+    };
 
 interface ContextMenuProps {
   x: number;
@@ -102,22 +106,28 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
         }`}
         style={{ top: posY, left: posX }}
       >
-        {items.map((item, index) => (
-          <div
-            key={index}
-            onClick={(e) => {
-              e.stopPropagation();
-              item.onClick();
-              handleClose();
-            }}
-            className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-              item.danger ? "text-red-400 hover:bg-red-400/10" : "text-text hover:bg-white/10"
-            }`}
-          >
-            {item.icon && <item.icon size={16} />}
-            <span className="text-[0.85rem]">{item.label}</span>
-          </div>
-        ))}
+        {items.map((item, index) => {
+          if ("isSeparator" in item) {
+            return <div key={index} className="my-1 border-b border-bg-tertiary" />;
+          }
+
+          return (
+            <div
+              key={index}
+              onClick={(e) => {
+                e.stopPropagation();
+                item.onClick();
+                handleClose();
+              }}
+              className={`flex items-center gap-3 px-3 py-1 cursor-pointer transition-colors ${
+                item.danger ? "text-red-400 hover:bg-red-400/10" : "text-text hover:bg-white/10"
+              }`}
+            >
+              {item.icon && <item.icon size={16} />}
+              <span className="text-[0.85rem]">{item.label}</span>
+            </div>
+          );
+        })}
       </div>
     </>
   );

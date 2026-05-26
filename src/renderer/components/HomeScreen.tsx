@@ -485,6 +485,9 @@ const HomeScreen: React.FC = () => {
               onClick: () => handleRenameRecent(contextMenu.project),
             },
             {
+              isSeparator: true,
+            },
+            {
               label: "Export...",
               icon: ImageDown,
               onClick: () => handleExportRecent(contextMenu.project),
@@ -493,6 +496,9 @@ const HomeScreen: React.FC = () => {
               label: "Export to Clipboard",
               icon: Images,
               onClick: () => handleExportRecent(contextMenu.project, true),
+            },
+            {
+              isSeparator: true,
             },
             {
               label: "Remove from List",
