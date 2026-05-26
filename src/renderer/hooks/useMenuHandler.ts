@@ -212,6 +212,11 @@ export const useMenuHandler = () => {
           window.dispatchEvent(new CustomEvent("forge:open-export-modal"));
           break;
 
+        case "export-to-clipboard":
+          if (!activeProject) return;
+          window.dispatchEvent(new CustomEvent("forge:export-to-clipboard"));
+          break;
+
         case "undo":
           if (isInputFocused) {
             try {

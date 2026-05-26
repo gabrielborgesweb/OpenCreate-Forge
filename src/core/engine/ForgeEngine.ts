@@ -260,6 +260,57 @@ export class ForgeEngine {
     window.addEventListener("forge:request-export-preview", this.handleRequestExportPreview as any);
     window.addEventListener("forge:request-thumbnail", this.handleRequestThumbnail as any);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
+    window.addEventListener("forge:export-to-clipboard", this.handleExportToClipboard as any);
+  }
+
+  /**
+   * Handles exporting the full project to the clipboard.
+   */
+  private handleExportToClipboard = async () => {
+    if (!this.project) return;
+    await this.exportToClipboard();
+  };
+
+  /**
+   * Copies the entire project to the system clipboard.
+   */
+  public async exportToClipboard() {
+    if (!this.project) return;
+
+    // We avoid fetch(dataURL) due to CSP restrictions in some environments.
+    // Instead, we'll manually render the project to a blob.
+    const finalWidth = this.project.width;
+    const finalHeight = this.project.height;
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = finalWidth;
+    exportCanvas.height = finalHeight;
+    const exportCtx = exportCanvas.getContext("2d")!;
+    exportCtx.imageSmoothingEnabled = false;
+
+    for (const layer of this.project.layers) {
+      if (layer.visible) {
+        this.renderLayer(exportCtx, layer);
+      }
+    }
+
+    try {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        exportCanvas.toBlob(resolve, "image/png"),
+      );
+
+      if (!blob) throw new Error("Failed to create blob");
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+      useUIStore.getState().showToast("Project copied to clipboard", "info");
+    } catch (err) {
+      console.error("Failed to export to clipboard:", err);
+      useUIStore.getState().showToast("Failed to copy to clipboard", "error");
+    }
   }
 
   /**
