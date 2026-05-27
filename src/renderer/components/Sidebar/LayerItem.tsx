@@ -19,9 +19,10 @@ interface LayerItemProps {
   projectId: string;
   isActive: boolean;
   index: number;
+  draggedIndex: number | null;
   onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number, position: "top" | "bottom") => void;
+  onDrop: (e: React.DragEvent, index: number, position: "top" | "bottom") => void;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
@@ -29,6 +30,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   projectId,
   isActive,
   index,
+  draggedIndex,
   onDragStart,
   onDragOver,
   onDrop,
@@ -42,8 +44,9 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(layer.name);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [dropPosition, setDropPosition] = useState<"top" | "bottom" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -52,7 +55,30 @@ const LayerItem: React.FC<LayerItemProps> = ({
     }
   }, [isEditing]);
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
 
+    // Prevent feedback on the item being dragged
+    if (draggedIndex === index) {
+      return;
+    }
+
+    if (itemRef.current) {
+      const rect = itemRef.current.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      const position = e.clientY <= midpoint ? "top" : "bottom";
+      setDropPosition(position);
+      onDragOver(e, index, position);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dropPosition) {
+      onDrop(e, index, dropPosition);
+    }
+    setDropPosition(null);
+  };
 
   const toggleVisibility = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -159,21 +185,18 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
   return (
     <div
-      className={`group flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-colors ${
+      ref={itemRef}
+      className={`group flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-all ${
         isActive ? "bg-bg-tertiary" : "bg-transparent hover:bg-white/5"
-      } ${!layer.visible ? "opacity-60" : ""} ${isDragOver ? "border-t-2 border-t-accent" : ""}`}
+      } ${!layer.visible ? "opacity-60" : ""} ${draggedIndex === index ? "opacity-30" : ""} ${
+        dropPosition === "top" ? "border-t-2 border-t-accent" : ""
+      } ${dropPosition === "bottom" ? "border-b-2 border-b-accent" : ""}`}
       onClick={() => setActiveLayer(projectId, layer.id)}
       draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, index)}
-      onDragOver={(e) => {
-        setIsDragOver(true);
-        onDragOver(e);
-      }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => {
-        setIsDragOver(false);
-        onDrop(e, index);
-      }}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setDropPosition(null)}
+      onDrop={handleDrop}
     >
       <button
         onClick={toggleVisibility}
@@ -215,10 +238,13 @@ const LayerItem: React.FC<LayerItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <div className="text-[0.85rem] truncate" onDoubleClick={() => {
-            setEditName(layer.name);
-            setIsEditing(true);
-          }}>
+          <div
+            className="text-[0.85rem] truncate"
+            onDoubleClick={() => {
+              setEditName(layer.name);
+              setIsEditing(true);
+            }}
+          >
             {layer.name}
           </div>
         )}

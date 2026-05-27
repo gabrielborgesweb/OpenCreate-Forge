@@ -16,11 +16,14 @@ const LayerList: React.FC = () => {
   const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
   const moveLayer = useProjectStore((state) => state.moveLayer);
 
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+
   if (!project) return <div className="p-4 text-[#666]">No active project</div>;
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData("text/plain", index.toString());
     e.dataTransfer.effectAllowed = "move";
+    setDraggedIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -28,11 +31,31 @@ const LayerList: React.FC = () => {
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+  const handleDrop = (e: React.DragEvent, toIndex?: number, position?: "top" | "bottom") => {
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
-    if (fromIndex !== toIndex) {
-      moveLayer(project.id, fromIndex, toIndex);
+
+    setDraggedIndex(null);
+    if (isNaN(fromIndex)) return;
+
+    let finalIndex = toIndex;
+
+    if (toIndex !== undefined && position !== undefined) {
+      if (position === "top") {
+        // UI Top = actual index. If moving from below, it stays at toIndex.
+        // If moving from above, it stays at toIndex.
+        finalIndex = toIndex;
+      } else {
+        // UI Bottom = one index lower in the actual stack.
+        finalIndex = toIndex - 1;
+      }
+    } else if (toIndex === undefined) {
+      // Dropped on the container, move to the bottom of the stack (index 0)
+      finalIndex = 0;
+    }
+
+    if (finalIndex !== undefined && finalIndex >= 0 && fromIndex !== finalIndex) {
+      moveLayer(project.id, fromIndex, finalIndex);
     }
   };
 
@@ -56,7 +79,12 @@ const LayerList: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div
+      className="flex flex-col flex-1 overflow-hidden"
+      onDragOver={(e) => handleDragOver(e)}
+      onDrop={(e) => handleDrop(e)}
+      onDragEnd={() => setDraggedIndex(null)}
+    >
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {project.layers
           .slice()
@@ -71,6 +99,7 @@ const LayerList: React.FC = () => {
                 projectId={project.id}
                 isActive={project.activeLayerId === layer.id}
                 index={actualIndex}
+                draggedIndex={draggedIndex}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
