@@ -41,7 +41,9 @@ function App() {
   }, [initializeStore]);
 
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
-  const [newProjectInitialDimensions, setNewProjectInitialDimensions] = React.useState<{ width: number; height: number } | undefined>(undefined);
+  const [newProjectInitialDimensions, setNewProjectInitialDimensions] = React.useState<
+    { width: number; height: number } | undefined
+  >(undefined);
   const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = React.useState(false);
 
@@ -162,6 +164,8 @@ function App() {
           if (checkDirty("crop")) setActiveTool("crop");
         } else if (e.key.toLowerCase() === "t") {
           if (checkDirty("text")) setActiveTool("text");
+        } else if (e.key.toLowerCase() === "g") {
+          if (checkDirty("paintBucket")) setActiveTool("paintBucket");
         } else if (e.key.toLowerCase() === "x") {
           swapColors();
         } else if (e.key.toLowerCase() === "d") {
@@ -241,7 +245,6 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
-
       <NewProject
         isOpen={isNewProjectModalOpen}
         onClose={() => setIsNewProjectModalOpen(false)}
@@ -254,18 +257,20 @@ function App() {
           setExportProject(null);
         }}
         project={exportProject || undefined}
-      />      <PreferencesModal key={isPreferencesModalOpen ? "open" : "closed"} isOpen={isPreferencesModalOpen} onClose={() => setIsPreferencesModalOpen(false)} />
-
+      />{" "}
+      <PreferencesModal
+        key={isPreferencesModalOpen ? "open" : "closed"}
+        isOpen={isPreferencesModalOpen}
+        onClose={() => setIsPreferencesModalOpen(false)}
+      />
       {/* 1. Project Tabs */}
       <ProjectTabs />
-
       {/* 2. Dynamic Header (Tool Options) */}
       {activeTab !== "home" && (
         <header className="bg-[#222] border-b border-bg-tertiary flex items-center">
           <ToolOptions />
         </header>
       )}
-
       {/* 3. Main Area */}
       <main className="flex-1 flex overflow-hidden">
         {activeTab === "home" ? (
@@ -282,7 +287,6 @@ function App() {
           </>
         )}
       </main>
-
       {/* 4. Footer / Status Bar */}
       <footer className="h-[25px] px-4 bg-[#222] border-t border-bg-tertiary text-[0.75rem] flex items-center justify-between text-[#888]">
         <div>

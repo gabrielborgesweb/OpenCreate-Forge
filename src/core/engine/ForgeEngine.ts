@@ -11,6 +11,7 @@ import { TransformTool } from "../tools/TransformTool";
 import { SelectTool } from "../tools/SelectTool";
 import { CropTool } from "../tools/CropTool";
 import { TextTool } from "../tools/TextTool";
+import { PaintBucketTool } from "../tools/PaintBucketTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useUIStore } from "@/renderer/store/uiStore";
 import UPNG from "upng-js";
@@ -112,6 +113,7 @@ export class ForgeEngine {
       brush: new BrushTool(),
       pencil: new PencilTool(),
       eraser: new EraserTool(),
+      paintBucket: new PaintBucketTool(),
       transform: new TransformTool(),
       crop: new CropTool(),
       text: new TextTool(),
