@@ -79,6 +79,14 @@ export const createMockToolContext = (overrides: Partial<ToolContext> = {}): Too
     updateToolSettings: vi.fn(),
     subscribe: vi.fn(() => () => {}),
     animateFitToScreen: vi.fn(),
+    isLayerLocked: vi.fn((layerId: string) => {
+      const project = (overrides.project as any) || createMockProject();
+      return project.layers.find((l: any) => l.id === layerId)?.locked || false;
+    }),
+    isLayerVisible: vi.fn((layerId: string) => {
+      const project = (overrides.project as any) || createMockProject();
+      return project.layers.find((l: any) => l.id === layerId)?.visible || false;
+    }),
     ...overrides,
   };
 };

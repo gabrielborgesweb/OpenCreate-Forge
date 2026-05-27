@@ -16,8 +16,10 @@ export class PaintBucketTool extends BaseTool {
     const activeLayerId = context.project.activeLayerId;
     if (!activeLayerId) return;
 
+    if (context.isLayerLocked(activeLayerId) || !context.isLayerVisible(activeLayerId)) return;
+
     const layer = context.project.layers.find((l) => l.id === activeLayerId);
-    if (!layer || layer.locked || !layer.visible) return;
+    if (!layer) return;
 
     if (layer.type !== "raster") {
       useUIStore.getState().showToast("Cannot fill on a non-raster layer", "warning");

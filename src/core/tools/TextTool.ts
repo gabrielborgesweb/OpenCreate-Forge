@@ -485,7 +485,7 @@ export class TextTool extends BaseTool {
   private findTextLayerAt(x: number, y: number, context: ToolContext): Layer | null {
     const layers = [...context.project.layers].reverse();
     for (const layer of layers) {
-      if (layer.type === "text" && layer.visible && !layer.locked) {
+      if (layer.type === "text" && context.isLayerVisible(layer.id) && !context.isLayerLocked(layer.id)) {
         const localPos = this.worldToLocal(x, y, layer);
         const padding = 10;
         if (

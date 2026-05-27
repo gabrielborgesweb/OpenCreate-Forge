@@ -78,6 +78,10 @@ export interface Layer {
   textUndoStack?: { text: string; textSpans?: TextSpan[] }[];
   /** Internal redo stack for text editing. */
   textRedoStack?: { text: string; textSpans?: TextSpan[] }[];
+  /** ID of the parent group, if any. */
+  parentId?: string | null;
+  /** Whether the group is expanded in the UI. */
+  isExpanded?: boolean;
 }
 
 /**
@@ -209,6 +213,12 @@ interface ProjectState {
   isolateLayer: (projectId: string, layerId: string) => void;
   /** Toggles layer lock status. */
   toggleLayerLock: (projectId: string, layerId: string) => void;
+  /** Groups specified layers. */
+  groupLayers: (projectId: string, layerIds: string[]) => void;
+  /** Ungroups a specific group. */
+  ungroupLayers: (projectId: string, groupId: string) => void;
+  /** Toggles group expansion in the UI. */
+  toggleGroupExpansion: (projectId: string, groupId: string) => void;
   /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
   /** Sets the selected layers for a project. */
@@ -241,8 +251,14 @@ export const normalizeHistoryState = (state: any): HistoryState => ({
 export const normalizeProject = (project: any): Project => {
   const normalized = {
     ...project,
-    activeLayerId: project.activeLayerId || (project.layers?.[0]?.id || null),
-    selectedLayerIds: project.selectedLayerIds || (project.activeLayerId ? [project.activeLayerId] : project.layers?.[0] ? [project.layers[0].id] : []),
+    activeLayerId: project.activeLayerId || project.layers?.[0]?.id || null,
+    selectedLayerIds:
+      project.selectedLayerIds ||
+      (project.activeLayerId
+        ? [project.activeLayerId]
+        : project.layers?.[0]
+          ? [project.layers[0].id]
+          : []),
     selection: project.selection || { hasSelection: false, bounds: null },
     zoom: project.zoom || 1,
     panX: project.panX || 0,
@@ -265,7 +281,9 @@ export const createHistoryState = (project: Project): HistoryState => ({
   height: project.height,
   layers: JSON.parse(JSON.stringify(project.layers)),
   activeLayerId: project.activeLayerId,
-  selectedLayerIds: [...(project.selectedLayerIds || (project.activeLayerId ? [project.activeLayerId] : []))],
+  selectedLayerIds: [
+    ...(project.selectedLayerIds || (project.activeLayerId ? [project.activeLayerId] : [])),
+  ],
   selection: JSON.parse(JSON.stringify(project.selection)),
 });
 
@@ -282,12 +300,16 @@ export const getSerializableProject = (project: Project): any => {
 
   // We keep the history but limit it to avoid massive files due to Base64 data duplication.
   const persistedUndoStack = saveHistory ? undoStack.slice(-historyLimit) : [];
-  
+
   // Strip text history if saveHistory is off
   const processedLayers = saveHistory
     ? rest.layers
     : rest.layers.map((layer) => {
-        const { textUndoStack: _textUndoStack, textRedoStack: _textRedoStack, ...layerRest } = layer;
+        const {
+          textUndoStack: _textUndoStack,
+          textRedoStack: _textRedoStack,
+          ...layerRest
+        } = layer;
         return layerRest;
       });
 
@@ -336,7 +358,10 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         // and that it has a valid state (populating it if empty)
         if (normalizedProject.filePath) {
           const firstItem = finalUndoStack[0];
-          if (firstItem.description === "Initial State" || firstItem.description === "New Project") {
+          if (
+            firstItem.description === "Initial State" ||
+            firstItem.description === "New Project"
+          ) {
             firstItem.description = "Open Project";
           }
         }
@@ -567,15 +592,33 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       const remainingLayers = project.layers.filter((l) => !movingLayerIds.has(l.id));
 
       let targetIndex = 0;
+      let newParentId: string | null = null;
+
       if (targetLayerId) {
         const foundIndex = remainingLayers.findIndex((l) => l.id === targetLayerId);
         if (foundIndex !== -1) {
+          const targetLayer = remainingLayers[foundIndex];
           targetIndex = position === "above" ? foundIndex + 1 : foundIndex;
+          newParentId = targetLayer.parentId || null;
+
+          // Special case: if dropping "below" a group (in UI), make it the first child
+          if (position === "below" && targetLayer.type === "group") {
+            newParentId = targetLayer.id;
+          }
         }
       }
 
       const newLayers = [...remainingLayers];
-      newLayers.splice(targetIndex, 0, ...movingLayers);
+      const updatedMovingLayers = movingLayers.map((l) => {
+        // Only update parent if the layer's current parent is NOT among the layers being moved
+        // (This preserves internal group structure during move)
+        if (l.parentId && movingLayerIds.has(l.parentId)) {
+          return l;
+        }
+        return { ...l, parentId: newParentId };
+      });
+
+      newLayers.splice(targetIndex, 0, ...updatedMovingLayers);
 
       return {
         projects: state.projects.map((p) =>
@@ -738,6 +781,127 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         ),
       };
     }),
+
+  groupLayers: (projectId, layerIds) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project || layerIds.length === 0) return state;
+
+      const historyState = createHistoryState(project);
+
+      const movingLayerIds = new Set(layerIds);
+      const selectedLayers = project.layers.filter((l) => movingLayerIds.has(l.id));
+
+      if (selectedLayers.length === 0) return state;
+
+      // Identify insertion point: the highest index among selected layers
+      const indices = selectedLayers.map((l) => project.layers.indexOf(l));
+      const targetIndex = Math.max(...indices);
+
+      const groupId = Math.random().toString(36).substr(2, 9);
+      const newGroup: Layer = {
+        id: groupId,
+        name: "New Group",
+        type: "group",
+        visible: true,
+        locked: false,
+        opacity: 100,
+        isExpanded: true,
+        parentId: selectedLayers[0].parentId || null,
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        blendMode: "source-over",
+      };
+
+      // Remove moving layers and insert group + layers
+      const remainingLayers = project.layers.filter((l) => !movingLayerIds.has(l.id));
+      const adjustedTargetIndex = project.layers
+        .slice(0, targetIndex + 1)
+        .filter((l) => !movingLayerIds.has(l.id)).length;
+
+      const newLayers = [...remainingLayers];
+      newLayers.splice(
+        adjustedTargetIndex,
+        0,
+        ...selectedLayers.map((l) => ({ ...l, parentId: groupId })),
+        newGroup,
+      );
+
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Group Layers", state: historyState },
+      ];
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: newLayers,
+                activeLayerId: groupId,
+                selectedLayerIds: [groupId],
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
+            : p,
+        ),
+      };
+    }),
+
+  ungroupLayers: (projectId, groupId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const groupLayer = project.layers.find((l) => l.id === groupId);
+      if (!groupLayer || groupLayer.type !== "group") return state;
+
+      const historyState = createHistoryState(project);
+
+      const newLayers = project.layers
+        .filter((l) => l.id !== groupId)
+        .map((l) => (l.parentId === groupId ? { ...l, parentId: groupLayer.parentId || null } : l));
+
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Ungroup Layers", state: historyState },
+      ];
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: newLayers,
+                activeLayerId: null,
+                selectedLayerIds: [],
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
+            : p,
+        ),
+      };
+    }),
+
+  toggleGroupExpansion: (projectId, groupId) =>
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              layers: p.layers.map((l) =>
+                l.id === groupId ? { ...l, isExpanded: !l.isExpanded } : l,
+              ),
+            }
+          : p,
+      ),
+    })),
 
   undoText: (projectId, layerId) =>
     set((state) => ({

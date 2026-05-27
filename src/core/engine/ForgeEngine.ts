@@ -862,6 +862,16 @@ export class ForgeEngine {
       },
       ensureLayerCanvas: (layer: Layer) => this.ensureLayerCanvas(layer),
       animateFitToScreen: (ow?: number, oh?: number) => this.animateFitToScreen(ow, oh),
+      isLayerLocked: (layerId: string) => {
+        const layer = this.project?.layers.find((l) => l.id === layerId);
+        if (!layer) return false;
+        return layer.locked || this.isAncestorLocked(layer);
+      },
+      isLayerVisible: (layerId: string) => {
+        const layer = this.project?.layers.find((l) => l.id === layerId);
+        if (!layer) return false;
+        return layer.visible && this.isAncestorVisible(layer);
+      },
     };
 
     Object.defineProperty(context, "project", {
@@ -1454,6 +1464,28 @@ export class ForgeEngine {
   }
 
   /**
+   * Checks if all ancestors of a layer are visible.
+   */
+  private isAncestorVisible(layer: Layer): boolean {
+    if (!this.project || !layer.parentId) return true;
+    const parent = this.project.layers.find((l) => l.id === layer.parentId);
+    if (!parent) return true;
+    if (!parent.visible) return false;
+    return this.isAncestorVisible(parent);
+  }
+
+  /**
+   * Checks if any ancestor of a layer is locked.
+   */
+  private isAncestorLocked(layer: Layer): boolean {
+    if (!this.project || !layer.parentId) return false;
+    const parent = this.project.layers.find((l) => l.id === layer.parentId);
+    if (!parent) return false;
+    if (parent.locked) return true;
+    return this.isAncestorLocked(parent);
+  }
+
+  /**
    * Main render function that clears the canvas and draws the project, tools, and UI.
    */
   public render() {
@@ -1491,7 +1523,7 @@ export class ForgeEngine {
     this.projectCtx.imageSmoothingEnabled = false;
 
     for (const layer of this.project.layers) {
-      if (layer.visible) {
+      if (layer.visible && this.isAncestorVisible(layer)) {
         if (this.intersects(layer, this.project.width, this.project.height)) {
           this.renderLayer(this.projectCtx, layer);
         }
@@ -1523,7 +1555,11 @@ export class ForgeEngine {
 
     // Render layers that are outside the project (no clipping)
     for (const layer of this.project.layers) {
-      if (layer.visible && !this.intersects(layer, this.project.width, this.project.height)) {
+      if (
+        layer.visible &&
+        this.isAncestorVisible(layer) &&
+        !this.intersects(layer, this.project.width, this.project.height)
+      ) {
         this.renderLayer(this.ctx, layer);
       }
     }
@@ -1544,9 +1580,12 @@ export class ForgeEngine {
       if (activeLayer && activeLayer.id !== editingLayerId) {
         this.ctx.save();
 
-        if (!activeLayer.visible) {
+        const effectivelyVisible = activeLayer.visible && this.isAncestorVisible(activeLayer);
+        const effectivelyLocked = activeLayer.locked || this.isAncestorLocked(activeLayer);
+
+        if (!effectivelyVisible) {
           this.ctx.strokeStyle = "rgba(150, 150, 150, 0.7)";
-        } else if (activeLayer.locked) {
+        } else if (effectivelyLocked) {
           this.ctx.strokeStyle = "rgba(255, 204, 0, 0.9)";
         } else {
           this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";

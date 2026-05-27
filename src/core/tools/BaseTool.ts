@@ -70,6 +70,10 @@ export interface ToolContext {
   subscribe: (listener: (settings: ToolSettings) => void) => () => void;
   /** Animates the viewport to fit the project on screen. */
   animateFitToScreen: (overrideWidth?: number, overrideHeight?: number) => void;
+  /** Checks if a layer is effectively locked (including ancestors). */
+  isLayerLocked: (layerId: string) => boolean;
+  /** Checks if a layer is effectively visible (including ancestors). */
+  isLayerVisible: (layerId: string) => boolean;
 }
 
 /**

@@ -29,8 +29,8 @@ export class MoveTool extends BaseTool {
         .reverse()
         .find(
           (l) =>
-            l.visible &&
-            !l.locked &&
+            context.isLayerVisible(l.id) &&
+            !context.isLayerLocked(l.id) &&
             x >= l.x &&
             x <= l.x + l.width &&
             y >= l.y &&
@@ -47,8 +47,10 @@ export class MoveTool extends BaseTool {
     const activeLayerId = project.activeLayerId;
     if (!activeLayerId) return;
 
+    if (context.isLayerLocked(activeLayerId)) return;
+
     const layer = project.layers.find((l) => l.id === activeLayerId);
-    if (!layer || layer.locked) return;
+    if (!layer) return;
 
     // Capture snapshot BEFORE any changes
     this.historySnapshot = createHistoryState(project);
@@ -150,8 +152,7 @@ export class MoveTool extends BaseTool {
     const activeLayerId = project.activeLayerId;
     if (!activeLayerId) return false;
 
-    const layer = project.layers.find((l) => l.id === activeLayerId);
-    if (!layer || layer.locked) return false;
+    if (context.isLayerLocked(activeLayerId)) return false;
 
     e.preventDefault();
 

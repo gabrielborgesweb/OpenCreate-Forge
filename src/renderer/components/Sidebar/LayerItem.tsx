@@ -10,6 +10,10 @@ import {
   EyeOff,
   Lock,
   Unlock,
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  // ChevronDown,
   // Trash2,
   // Copy
 } from "lucide-react";
@@ -20,6 +24,7 @@ interface LayerItemProps {
   isActive: boolean;
   isSelected: boolean;
   index: number;
+  depth: number;
   draggedIndex: number | null;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent, index: number, position: "above" | "below") => void;
@@ -27,6 +32,7 @@ interface LayerItemProps {
   onClick: (e: React.MouseEvent, layerId: string) => void;
   onVisibilityMouseDown: (e: React.MouseEvent, layerId: string) => void;
   onVisibilityMouseEnter: (e: React.MouseEvent, layerId: string) => void;
+  onToggleExpansion: (projectId: string, layerId: string) => void;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
@@ -35,6 +41,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   isActive,
   isSelected,
   index,
+  depth,
   draggedIndex,
   onDragStart,
   onDragOver,
@@ -42,6 +49,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   onClick,
   onVisibilityMouseDown,
   onVisibilityMouseEnter,
+  onToggleExpansion,
 }) => {
   const renameLayer = useProjectStore((state) => state.renameLayer);
   const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
@@ -205,10 +213,12 @@ const LayerItem: React.FC<LayerItemProps> = ({
       onDragLeave={() => setDropPosition(null)}
       onDrop={handleDrop}
     >
+      {/* Visibility Toggle */}
       <button
         onMouseDown={(e) => onVisibilityMouseDown(e, layer.id)}
         onMouseEnter={(e) => onVisibilityMouseEnter(e, layer.id)}
         tabIndex={-1}
+        style={{ marginRight: `${depth * 12 + (layer.type !== "group" ? 8 : 2)}px` }}
         className={`bg-none border-none flex transition-colors mr-2 relative after:absolute after:inset-[-4px] after:cursor-pointer ${
           layer.visible ? "text-text" : "text-[#666]"
         }`}
@@ -216,23 +226,56 @@ const LayerItem: React.FC<LayerItemProps> = ({
         {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
       </button>
 
-      {/* Thumbnail */}
-      <div
-        className={`w-8 h-8 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
-        onClick={handleThumbnailClick}
-      >
-        {layer.data ? (
+      {/* Group Expansion Toggle */}
+      {layer.type === "group" && (
+        <button
+          className="p-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpansion(projectId, layer.id);
+          }}
+        >
+          {/* {layer.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} */}
+          <ChevronRight
+            size={14}
+            className="transition-all"
+            style={{ rotate: layer.isExpanded ? "90deg" : "0deg" }}
+          />
+        </button>
+      )}
+
+      {/* Thumbnail or Icon */}
+      {layer.type === "group" ? (
+        <button
+          className="p-1 text-text mr-2"
+          onDoubleClick={() => {
+            // toggle expand or collapse on double click
+            onToggleExpansion(projectId, layer.id);
+          }}
+        >
+          {layer.isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+        </button>
+      ) : layer.data ? (
+        <div
+          className={`w-8 h-8 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
+          onClick={handleThumbnailClick}
+        >
           <img
             src={layer.data}
             alt=""
             className="max-w-full max-h-full object-contain pointer-events-none"
           />
-        ) : (
+        </div>
+      ) : (
+        <div
+          className={`w-8 h-8 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
+          onClick={handleThumbnailClick}
+        >
           <div className="text-[0.6rem] text-[#555] pointer-events-none">
             {layer.type[0].toUpperCase()}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex-1 flex items-center min-w-0">
         {isEditing ? (
