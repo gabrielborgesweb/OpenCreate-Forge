@@ -526,6 +526,7 @@ export class TextTool extends BaseTool {
         height: context.project.height,
         layers: JSON.parse(JSON.stringify(context.project.layers)),
         activeLayerId: context.project.activeLayerId,
+        selectedLayerIds: [...context.project.selectedLayerIds],
         selection: JSON.parse(JSON.stringify(context.project.selection)),
       };
     }
@@ -560,6 +561,7 @@ export class TextTool extends BaseTool {
       height: context.project.height,
       layers: JSON.parse(JSON.stringify(context.project.layers)),
       activeLayerId: context.project.activeLayerId,
+      selectedLayerIds: [...context.project.selectedLayerIds],
       selection: JSON.parse(JSON.stringify(context.project.selection)),
     };
 

@@ -102,6 +102,7 @@ export interface HistoryState {
   height: number;
   layers: Layer[];
   activeLayerId: string | null;
+  selectedLayerIds: string[];
   selection: Selection;
 }
 
@@ -131,6 +132,8 @@ export interface Project {
   layers: Layer[];
   /** ID of the currently selected layer. */
   activeLayerId: string | null;
+  /** IDs of all selected layers for multi-selection. */
+  selectedLayerIds: string[];
   /** Current selection state. */
   selection: Selection;
   /** Current viewport zoom level. */
@@ -182,8 +185,13 @@ interface ProjectState {
   removeLayer: (projectId: string, layerId: string, skipHistory?: boolean) => void;
   /** Adds a manual entry to the project's history stack. */
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
-  /** Moves a layer from one index to another in the stack. */
-  moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
+  /** Reorders layers in the project stack. */
+  reorderLayers: (
+    projectId: string,
+    layerIds: string[],
+    targetLayerId: string | null,
+    position: "above" | "below",
+  ) => void;
   /** Duplicates an existing layer. */
   duplicateLayer: (projectId: string, layerId: string) => void;
   /** Updates properties of a specific layer. */
@@ -201,6 +209,8 @@ interface ProjectState {
   toggleLayerLock: (projectId: string, layerId: string) => void;
   /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
+  /** Sets the selected layers for a project. */
+  setSelectedLayers: (projectId: string, layerIds: string[]) => void;
   /** Reverts the last text change in a text layer. */
   undoText: (projectId: string, layerId: string) => void;
   /** Re-applies the last reverted text change in a text layer. */
@@ -217,11 +227,43 @@ interface ProjectState {
 
 const getMaxHistory = () => usePreferencesStore.getState().historyLimit;
 
+/**
+ * Normalizes a HistoryState object, providing default values for missing fields (legacy support).
+ */
+export const normalizeHistoryState = (state: any): HistoryState => ({
+  ...state,
+  selectedLayerIds: state.selectedLayerIds || (state.activeLayerId ? [state.activeLayerId] : []),
+  selection: state.selection || { hasSelection: false, bounds: null },
+});
+
+export const normalizeProject = (project: any): Project => {
+  const normalized = {
+    ...project,
+    activeLayerId: project.activeLayerId || (project.layers?.[0]?.id || null),
+    selectedLayerIds: project.selectedLayerIds || (project.activeLayerId ? [project.activeLayerId] : project.layers?.[0] ? [project.layers[0].id] : []),
+    selection: project.selection || { hasSelection: false, bounds: null },
+    zoom: project.zoom || 1,
+    panX: project.panX || 0,
+    panY: project.panY || 0,
+    isDirty: project.isDirty || false,
+    undoStack: (project.undoStack || []).map((entry: any) => ({
+      ...entry,
+      state: entry.state ? normalizeHistoryState(entry.state) : entry.state,
+    })),
+    redoStack: (project.redoStack || []).map((entry: any) => ({
+      ...entry,
+      state: entry.state ? normalizeHistoryState(entry.state) : entry.state,
+    })),
+  } as Project;
+  return normalized;
+};
+
 export const createHistoryState = (project: Project): HistoryState => ({
   width: project.width,
   height: project.height,
   layers: JSON.parse(JSON.stringify(project.layers)),
   activeLayerId: project.activeLayerId,
+  selectedLayerIds: [...(project.selectedLayerIds || (project.activeLayerId ? [project.activeLayerId] : []))],
   selection: JSON.parse(JSON.stringify(project.selection)),
 });
 
@@ -278,16 +320,19 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         return { activeProjectId: existingProject.id };
       }
 
-      const initialState = createHistoryState(project);
+      // Normalize project for legacy data
+      const normalizedProject = normalizeProject(project);
 
-      let finalUndoStack = project.undoStack || [];
+      const initialState = createHistoryState(normalizedProject);
+
+      let finalUndoStack = normalizedProject.undoStack || [];
       if (finalUndoStack.length === 0) {
-        const description = project.filePath ? "Open Project" : "Initial State";
+        const description = normalizedProject.filePath ? "Open Project" : "Initial State";
         finalUndoStack = [{ description, state: initialState }];
       } else {
         // If it's an existing project being opened, ensure the base item is "Open Project"
         // and that it has a valid state (populating it if empty)
-        if (project.filePath) {
+        if (normalizedProject.filePath) {
           const firstItem = finalUndoStack[0];
           if (firstItem.description === "Initial State" || firstItem.description === "New Project") {
             firstItem.description = "Open Project";
@@ -307,15 +352,15 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         projects: [
           ...state.projects,
           {
-            ...project,
-            version: project.version || state.appVersion,
-            createdAt: project.createdAt || now,
-            updatedAt: project.updatedAt || now,
+            ...normalizedProject,
+            version: normalizedProject.version || state.appVersion,
+            createdAt: normalizedProject.createdAt || now,
+            updatedAt: normalizedProject.updatedAt || now,
             undoStack: finalUndoStack,
-            redoStack: project.redoStack || [],
+            redoStack: normalizedProject.redoStack || [],
           },
         ],
-        activeProjectId: project.id,
+        activeProjectId: normalizedProject.id,
       };
     }),
 
@@ -388,6 +433,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
                 ...p,
                 layers: [...p.layers, newLayer],
                 activeLayerId: id,
+                selectedLayerIds: [id],
                 isDirty: true,
                 undoStack: newUndoStack,
                 redoStack: !skipHistory ? [] : p.redoStack,
@@ -417,6 +463,11 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
         newActiveLayerId = newLayers[Math.max(0, index - 1)]?.id || null;
       }
 
+      const newSelectedLayerIds = project.selectedLayerIds.filter((id) => id !== layerId);
+      if (newSelectedLayerIds.length === 0 && newActiveLayerId) {
+        newSelectedLayerIds.push(newActiveLayerId);
+      }
+
       return {
         projects: state.projects.map((p) =>
           p.id === projectId
@@ -424,6 +475,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
                 ...p,
                 layers: newLayers,
                 activeLayerId: newActiveLayerId,
+                selectedLayerIds: newSelectedLayerIds,
                 isDirty: true,
                 undoStack: newUndoStack,
                 redoStack: !skipHistory ? [] : p.redoStack,
@@ -484,6 +536,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
                 ...p,
                 layers: newLayers,
                 activeLayerId: newId,
+                selectedLayerIds: [newId],
                 isDirty: true,
                 undoStack: newUndoStack,
                 redoStack: [],
@@ -493,7 +546,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       };
     }),
 
-  moveLayer: (projectId, fromIndex, toIndex) =>
+  reorderLayers: (projectId, layerIds, targetLayerId, position) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
@@ -502,18 +555,36 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       const historyState = createHistoryState(project);
       const newUndoStack = [
         ...project.undoStack,
-        { description: "Move Layer", state: historyState },
+        { description: layerIds.length > 1 ? "Move Layers" : "Move Layer", state: historyState },
       ];
       if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
-      const newLayers = [...project.layers];
-      const [movedLayer] = newLayers.splice(fromIndex, 1);
-      newLayers.splice(toIndex, 0, movedLayer);
+      const movingLayerIds = new Set(layerIds);
+      const movingLayers = project.layers.filter((l) => movingLayerIds.has(l.id));
+
+      const remainingLayers = project.layers.filter((l) => !movingLayerIds.has(l.id));
+
+      let targetIndex = 0;
+      if (targetLayerId) {
+        const foundIndex = remainingLayers.findIndex((l) => l.id === targetLayerId);
+        if (foundIndex !== -1) {
+          targetIndex = position === "above" ? foundIndex + 1 : foundIndex;
+        }
+      }
+
+      const newLayers = [...remainingLayers];
+      newLayers.splice(targetIndex, 0, ...movingLayers);
 
       return {
         projects: state.projects.map((p) =>
           p.id === projectId
-            ? { ...p, layers: newLayers, isDirty: true, undoStack: newUndoStack, redoStack: [] }
+            ? {
+                ...p,
+                layers: newLayers,
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
             : p,
         ),
       };
@@ -678,7 +749,32 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
   setActiveLayer: (projectId, layerId) =>
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, activeLayerId: layerId } : p,
+        p.id === projectId
+          ? {
+              ...p,
+              activeLayerId: layerId,
+              selectedLayerIds: layerId ? [layerId] : [],
+            }
+          : p,
+      ),
+    })),
+
+  setSelectedLayers: (projectId, layerIds) =>
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              selectedLayerIds: layerIds,
+              // Keep the active layer as the first one if not specified or already in selection
+              activeLayerId:
+                layerIds.length > 0
+                  ? layerIds.includes(p.activeLayerId || "")
+                    ? p.activeLayerId
+                    : layerIds[layerIds.length - 1]
+                  : null,
+            }
+          : p,
       ),
     })),
 

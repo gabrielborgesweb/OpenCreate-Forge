@@ -100,6 +100,7 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose, initialDimensi
           },
         ],
         activeLayerId: "bg-" + id,
+        selectedLayerIds: ["bg-" + id],
         selection: { hasSelection: false, bounds: null },
         zoom: 1,
         panX: 0,

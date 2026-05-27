@@ -35,6 +35,7 @@ export const createProjectFromImage = (
       },
     ],
     activeLayerId: layerId,
+    selectedLayerIds: [layerId],
     selection: { hasSelection: false, bounds: null },
     zoom: 1,
     panX: 0,

@@ -14,14 +14,26 @@ const LayerList: React.FC = () => {
   const addLayer = useProjectStore((state) => state.addLayer);
   const removeLayer = useProjectStore((state) => state.removeLayer);
   const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
-  const moveLayer = useProjectStore((state) => state.moveLayer);
+  const reorderLayers = useProjectStore((state) => state.reorderLayers);
+  const setSelectedLayers = useProjectStore((state) => state.setSelectedLayers);
+  const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
+  const updateProject = useProjectStore((state) => state.updateProject);
 
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
   if (!project) return <div className="p-4 text-[#666]">No active project</div>;
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData("text/plain", index.toString());
+    // If the dragged item is not part of the selection, select only it
+    let layersToMove = project.selectedLayerIds;
+    const draggedLayerId = project.layers[index].id;
+
+    if (!layersToMove.includes(draggedLayerId)) {
+      layersToMove = [draggedLayerId];
+      setSelectedLayers(project.id, layersToMove);
+    }
+
+    e.dataTransfer.setData("text/plain", JSON.stringify(layersToMove));
     e.dataTransfer.effectAllowed = "move";
     setDraggedIndex(index);
   };
@@ -31,31 +43,84 @@ const LayerList: React.FC = () => {
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e: React.DragEvent, toIndex?: number, position?: "top" | "bottom") => {
+  const handleDrop = (e: React.DragEvent, toIndex?: number, position?: "above" | "below") => {
     e.preventDefault();
-    const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+    e.stopPropagation();
 
+    // if (position !== "above" && position !== "below") {
+    //   // Dropped on the container, move to end
+    //   toIndex = project.layers.length - 1;
+    //   position = "below";
+    // }
+
+    const data = e.dataTransfer.getData("text/plain");
     setDraggedIndex(null);
-    if (isNaN(fromIndex)) return;
 
-    let finalIndex = toIndex;
+    if (!data) return;
 
-    if (toIndex !== undefined && position !== undefined) {
-      if (position === "top") {
-        // UI Top = actual index. If moving from below, it stays at toIndex.
-        // If moving from above, it stays at toIndex.
-        finalIndex = toIndex;
-      } else {
-        // UI Bottom = one index lower in the actual stack.
-        finalIndex = toIndex - 1;
+    let layerIds: string[] = [];
+    try {
+      layerIds = JSON.parse(data);
+    } catch {
+      // Fallback for single index (compatibility with old data)
+      const fromIndex = parseInt(data, 10);
+      if (!isNaN(fromIndex)) {
+        layerIds = [project.layers[fromIndex].id];
       }
-    } else if (toIndex === undefined) {
-      // Dropped on the container, move to the bottom of the stack (index 0)
-      finalIndex = 0;
     }
 
-    if (finalIndex !== undefined && finalIndex >= 0 && fromIndex !== finalIndex) {
-      moveLayer(project.id, fromIndex, finalIndex);
+    if (layerIds.length === 0) return;
+
+    // Only process if dropped on a LayerItem (toIndex is defined)
+    // OR if dropped on the LayerList container itself (toIndex is undefined)
+    const targetLayerId = toIndex !== undefined ? project.layers[toIndex].id : null;
+    const reorderPosition = position === "above" ? "above" : "below"; // Default to "below" if position is undefined
+
+    console.log("Reordering layers: ", {
+      projectId: project.id,
+      layerIds,
+      targetLayerId,
+      reorderPosition,
+    });
+
+    reorderLayers(project.id, layerIds, targetLayerId, reorderPosition);
+  };
+
+  const handleLayerClick = (e: React.MouseEvent, layerId: string) => {
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const isShift = e.shiftKey;
+
+    if (isShift && project.activeLayerId) {
+      // Selection range
+      const startIndex = project.layers.findIndex((l) => l.id === project.activeLayerId);
+      const endIndex = project.layers.findIndex((l) => l.id === layerId);
+
+      const start = Math.min(startIndex, endIndex);
+      const end = Math.max(startIndex, endIndex);
+
+      const rangeIds = project.layers.slice(start, end + 1).map((l) => l.id);
+      setSelectedLayers(project.id, rangeIds);
+      updateProject(project.id, { activeLayerId: layerId });
+    } else if (isCtrl) {
+      // Toggle individual
+      const isSelected = project.selectedLayerIds.includes(layerId);
+
+      if (isSelected && project.activeLayerId !== layerId) {
+        // If already selected but not active, just make it active without changing selection
+        updateProject(project.id, { activeLayerId: layerId });
+      } else if (isSelected) {
+        // If already active and selected, deselect it
+        const newSelection = project.selectedLayerIds.filter((id) => id !== layerId);
+        setSelectedLayers(project.id, newSelection);
+      } else {
+        // Add to selection and make active
+        const newSelection = [...project.selectedLayerIds, layerId];
+        setSelectedLayers(project.id, newSelection);
+        updateProject(project.id, { activeLayerId: layerId });
+      }
+    } else {
+      // Single selection
+      setActiveLayer(project.id, layerId);
     }
   };
 
@@ -72,6 +137,13 @@ const LayerList: React.FC = () => {
     }
   };
 
+  const handleLayerDropOnContainer = (e: React.DragEvent) => {
+    // Only handle if directly on the container (empty space)
+    if (e.target === e.currentTarget) {
+      handleDrop(e);
+    }
+  };
+
   const handleDuplicateActiveLayer = () => {
     if (project.activeLayerId) {
       duplicateLayer(project.id, project.activeLayerId);
@@ -82,10 +154,21 @@ const LayerList: React.FC = () => {
     <div
       className="flex flex-col flex-1 overflow-hidden"
       onDragOver={(e) => handleDragOver(e)}
-      onDrop={(e) => handleDrop(e)}
+      onDrop={handleLayerDropOnContainer}
       onDragEnd={() => setDraggedIndex(null)}
     >
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div
+        className="flex-1 overflow-y-auto custom-scrollbar"
+        onDragOver={(e) => handleDragOver(e)}
+        onDrop={handleLayerDropOnContainer}
+        onClick={(e) => {
+          // Deselect layers if clicking on empty space
+          if (e.target === e.currentTarget) {
+            setSelectedLayers(project.id, []);
+            setActiveLayer(project.id, null);
+          }
+        }}
+      >
         {project.layers
           .slice()
           .reverse()
@@ -98,11 +181,13 @@ const LayerList: React.FC = () => {
                 layer={layer}
                 projectId={project.id}
                 isActive={project.activeLayerId === layer.id}
+                isSelected={project.selectedLayerIds.includes(layer.id)}
                 index={actualIndex}
                 draggedIndex={draggedIndex}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
+                onClick={handleLayerClick}
               />
             );
           })}

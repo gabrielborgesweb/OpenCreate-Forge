@@ -18,33 +18,37 @@ interface LayerItemProps {
   layer: Layer;
   projectId: string;
   isActive: boolean;
+  isSelected: boolean;
   index: number;
   draggedIndex: number | null;
   onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number, position: "top" | "bottom") => void;
-  onDrop: (e: React.DragEvent, index: number, position: "top" | "bottom") => void;
+  onDragOver: (e: React.DragEvent, index: number, position: "above" | "below") => void;
+  onDrop: (e: React.DragEvent, index: number, position: "above" | "below") => void;
+  onClick: (e: React.MouseEvent, layerId: string) => void;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
   layer,
   projectId,
   isActive,
+  isSelected,
   index,
   draggedIndex,
   onDragStart,
   onDragOver,
   onDrop,
+  onClick,
 }) => {
   const renameLayer = useProjectStore((state) => state.renameLayer);
   const toggleLayerVisibility = useProjectStore((state) => state.toggleLayerVisibility);
   const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
-  const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
+  // const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
   const updateProject = useProjectStore((state) => state.updateProject);
   const showToast = useUIStore((state) => state.showToast);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(layer.name);
-  const [dropPosition, setDropPosition] = useState<"top" | "bottom" | null>(null);
+  const [dropPosition, setDropPosition] = useState<"above" | "below" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +70,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
     if (itemRef.current) {
       const rect = itemRef.current.getBoundingClientRect();
       const midpoint = rect.top + rect.height / 2;
-      const position = e.clientY <= midpoint ? "top" : "bottom";
+      const position = e.clientY <= midpoint ? "above" : "below";
       setDropPosition(position);
       onDragOver(e, index, position);
     }
@@ -74,6 +78,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (dropPosition) {
       onDrop(e, index, dropPosition);
     }
@@ -187,11 +192,15 @@ const LayerItem: React.FC<LayerItemProps> = ({
     <div
       ref={itemRef}
       className={`group flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-all ${
-        isActive ? "bg-bg-tertiary" : "bg-transparent hover:bg-white/5"
+        isActive
+          ? "bg-bg-tertiary shadow-[inset_1px_0_0_0_var(--color-accent)]"
+          : isSelected
+            ? "bg-bg-tertiary/70"
+            : "bg-transparent hover:bg-bg-tertiary/30"
       } ${!layer.visible ? "opacity-60" : ""} ${draggedIndex === index ? "opacity-30" : ""} ${
-        dropPosition === "top" ? "border-t-2 border-t-accent" : ""
-      } ${dropPosition === "bottom" ? "border-b-2 border-b-accent" : ""}`}
-      onClick={() => setActiveLayer(projectId, layer.id)}
+        dropPosition === "above" ? "border-t-2 border-t-accent" : ""
+      } ${dropPosition === "below" ? "border-b-2 border-b-accent" : ""}`}
+      onClick={(e) => onClick(e, layer.id)}
       draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, index)}
       onDragOver={handleDragOver}
