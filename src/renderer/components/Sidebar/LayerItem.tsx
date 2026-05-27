@@ -25,6 +25,8 @@ interface LayerItemProps {
   onDragOver: (e: React.DragEvent, index: number, position: "above" | "below") => void;
   onDrop: (e: React.DragEvent, index: number, position: "above" | "below") => void;
   onClick: (e: React.MouseEvent, layerId: string) => void;
+  onVisibilityMouseDown: (e: React.MouseEvent, layerId: string) => void;
+  onVisibilityMouseEnter: (e: React.MouseEvent, layerId: string) => void;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
@@ -38,9 +40,10 @@ const LayerItem: React.FC<LayerItemProps> = ({
   onDragOver,
   onDrop,
   onClick,
+  onVisibilityMouseDown,
+  onVisibilityMouseEnter,
 }) => {
   const renameLayer = useProjectStore((state) => state.renameLayer);
-  const toggleLayerVisibility = useProjectStore((state) => state.toggleLayerVisibility);
   const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
   // const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
   const updateProject = useProjectStore((state) => state.updateProject);
@@ -83,11 +86,6 @@ const LayerItem: React.FC<LayerItemProps> = ({
       onDrop(e, index, dropPosition);
     }
     setDropPosition(null);
-  };
-
-  const toggleVisibility = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleLayerVisibility(projectId, layer.id);
   };
 
   const toggleLock = (e: React.MouseEvent) => {
@@ -208,9 +206,10 @@ const LayerItem: React.FC<LayerItemProps> = ({
       onDrop={handleDrop}
     >
       <button
-        onClick={toggleVisibility}
+        onMouseDown={(e) => onVisibilityMouseDown(e, layer.id)}
+        onMouseEnter={(e) => onVisibilityMouseEnter(e, layer.id)}
         tabIndex={-1}
-        className={`bg-none border-none cursor-pointer flex transition-colors mr-2 ${
+        className={`bg-none border-none flex transition-colors mr-2 relative after:absolute after:inset-[-4px] after:cursor-pointer ${
           layer.visible ? "text-text" : "text-[#666]"
         }`}
       >

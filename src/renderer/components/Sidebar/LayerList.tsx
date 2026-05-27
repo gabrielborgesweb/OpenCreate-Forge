@@ -18,10 +18,61 @@ const LayerList: React.FC = () => {
   const setSelectedLayers = useProjectStore((state) => state.setSelectedLayers);
   const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
   const updateProject = useProjectStore((state) => state.updateProject);
+  const isolateLayer = useProjectStore((state) => state.isolateLayer);
+  const updateLayer = useProjectStore((state) => state.updateLayer);
+  const pushHistory = useProjectStore((state) => state.pushHistory);
 
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+  const [visibilityDrag, setVisibilityDrag] = React.useState<{
+    targetVisible: boolean;
+    changedAny: boolean;
+  } | null>(null);
+
+  // Global mouseup listener for visibility dragging
+  React.useEffect(() => {
+    if (!visibilityDrag) return;
+
+    const handleGlobalMouseUp = () => {
+      if (visibilityDrag.changedAny && activeProjectId) {
+        pushHistory(activeProjectId, "Visibility Change");
+      }
+      setVisibilityDrag(null);
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, [visibilityDrag, activeProjectId, pushHistory]);
 
   if (!project) return <div className="p-4 text-[#666]">No active project</div>;
+
+  const handleVisibilityMouseDown = (e: React.MouseEvent, layerId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (e.altKey) {
+      isolateLayer(project.id, layerId);
+      return;
+    }
+
+    const layer = project.layers.find((l) => l.id === layerId);
+    if (!layer) return;
+
+    const newVisible = !layer.visible;
+    updateLayer(project.id, layerId, { visible: newVisible });
+    setVisibilityDrag({ targetVisible: newVisible, changedAny: true });
+  };
+
+  const handleVisibilityMouseEnter = (_e: React.MouseEvent, layerId: string) => {
+    if (!visibilityDrag) return;
+
+    const layer = project.layers.find((l) => l.id === layerId);
+    if (!layer || layer.visible === visibilityDrag.targetVisible) return;
+
+    updateLayer(project.id, layerId, { visible: visibilityDrag.targetVisible });
+    if (!visibilityDrag.changedAny) {
+      setVisibilityDrag({ ...visibilityDrag, changedAny: true });
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     // If the dragged item is not part of the selection, select only it
@@ -188,6 +239,8 @@ const LayerList: React.FC = () => {
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={handleLayerClick}
+                onVisibilityMouseDown={handleVisibilityMouseDown}
+                onVisibilityMouseEnter={handleVisibilityMouseEnter}
               />
             );
           })}

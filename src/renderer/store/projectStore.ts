@@ -205,6 +205,8 @@ interface ProjectState {
   renameLayer: (projectId: string, layerId: string, name: string) => void;
   /** Toggles layer visibility. */
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
+  /** Isolate a layer (hide all others, or show all if already isolated). */
+  isolateLayer: (projectId: string, layerId: string) => void;
   /** Toggles layer lock status. */
   toggleLayerLock: (projectId: string, layerId: string) => void;
   /** Sets the active layer for a project. */
@@ -658,6 +660,49 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
             ? {
                 ...p,
                 layers: p.layers.map((l) => (l.id === layerId ? { ...l, visible: !l.visible } : l)),
+                undoStack: newUndoStack,
+                redoStack: [],
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  isolateLayer: (projectId, layerId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyState = createHistoryState(project);
+
+      // Check if it's already "isolated" (this one is visible and ALL others are hidden)
+      const isAlreadyIsolated =
+        project.layers.find((l) => l.id === layerId)?.visible &&
+        project.layers.every((l) => l.id === layerId || !l.visible);
+
+      let newLayers;
+      let description;
+
+      if (isAlreadyIsolated) {
+        // Restore: show all layers
+        newLayers = project.layers.map((l) => ({ ...l, visible: true }));
+        description = "Show All Layers";
+      } else {
+        // Isolate: show only this one
+        newLayers = project.layers.map((l) => ({ ...l, visible: l.id === layerId }));
+        description = "Isolate Layer";
+      }
+
+      const newUndoStack = [...project.undoStack, { description, state: historyState }];
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: newLayers,
                 undoStack: newUndoStack,
                 redoStack: [],
                 isDirty: true,
