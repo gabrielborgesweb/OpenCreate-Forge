@@ -189,7 +189,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   return (
     <div
       ref={itemRef}
-      className={`group flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-all ${
+      className={`group flex items-center p-1 px-2 select-none border-b border-bg-tertiary ${
         isActive
           ? "bg-bg-tertiary shadow-[inset_1px_0_0_0_var(--color-accent)]"
           : isSelected
@@ -218,7 +218,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
       {/* Thumbnail */}
       <div
-        className={`w-6 h-6 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
+        className={`w-8 h-8 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
         onClick={handleThumbnailClick}
       >
         {layer.data ? (
@@ -278,7 +278,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
         <button
           onClick={toggleLock}
           tabIndex={-1}
-          className={`p-1 transition-colors ${
+          className={`p-1 !cursor-pointer transition-colors ${
             layer.locked ? "text-[#ffcc00]" : "text-[#666] hover:text-text"
           }`}
         >
