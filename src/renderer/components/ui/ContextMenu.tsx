@@ -51,18 +51,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
   }, [handleClose]);
 
   // Adjust position if menu goes off screen
-  const menuWidth = 200;
-  const menuHeight = items.length * 36 + 16; // Approximate height
+  // const menuWidth = 200;
+  // const menuHeight = items.length * 36 + 16; // Approximate height
 
-  let posX = x;
-  let posY = y;
+  const posX = x;
+  const posY = y;
 
-  if (x + menuWidth > window.innerWidth) {
-    posX = x - menuWidth;
-  }
-  if (y + menuHeight > window.innerHeight) {
-    posY = y - menuHeight;
-  }
+  // if (x + menuWidth > window.innerWidth) {
+  //   posX = x - menuWidth;
+  // }
+  // if (y + menuHeight > window.innerHeight) {
+  //   posY = y - menuHeight;
+  // }
 
   return (
     <>
