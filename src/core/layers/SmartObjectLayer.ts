@@ -30,13 +30,19 @@ export class SmartObjectLayer {
     // This is identical to RasterLayer rendering but explicitly for smart_object types.
     let lCanvas = layerCanvasCache.get(layer.id);
 
-    if (!lCanvas || lCanvas.width !== layer.width || lCanvas.height !== layer.height) {
+    if (
+      !lCanvas ||
+      lCanvas.width !== layer.width ||
+      lCanvas.height !== layer.height ||
+      (lCanvas as any)._dataUrl !== layer.data
+    ) {
       if (layer.data) {
         const populateCache = (image: HTMLImageElement) => {
           if (image.naturalWidth === 0) return null;
           const cachedCanvas = document.createElement("canvas");
           cachedCanvas.width = layer.width;
           cachedCanvas.height = layer.height;
+          (cachedCanvas as any)._dataUrl = layer.data;
           const cctx = cachedCanvas.getContext("2d")!;
           cctx.drawImage(image, 0, 0, layer.width, layer.height);
           layerCanvasCache.set(layer.id, cachedCanvas);

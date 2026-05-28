@@ -55,6 +55,7 @@ export interface Layer {
     width: number;
     height: number;
     rotation: number;
+    data?: string;
   };
   /** Raw text content for text layers. */
   text?: string;
@@ -233,6 +234,8 @@ interface ProjectState {
   convertToSmartObject: (projectId: string, layerIds: string[]) => Promise<void>;
   /** Rasterizes a Smart Object layer. */
   rasterizeSmartObject: (projectId: string, layerId: string) => void;
+  /** Resets the transformation of a Smart Object to its original state. */
+  resetSmartObjectTransform: (projectId: string, layerId: string) => void;
   /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
   /** Sets the selected layers for a project. */
@@ -1060,6 +1063,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         width,
         height,
         rotation: 0,
+        data: dataURL,
       },
       parentId: selectedLayers[0].parentId || null,
     };
@@ -1131,6 +1135,48 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                 undoStack: newUndoStack,
                 redoStack: [],
                 parentId: null,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  resetSmartObjectTransform: (projectId, layerId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const layer = project.layers.find((l) => l.id === layerId);
+      if (!layer || layer.type !== "smart_object" || !layer.originalTransform) return state;
+
+      const historyState = createHistoryState(project);
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Reset Smart Object Transform", state: historyState },
+      ];
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: p.layers.map((l) =>
+                  l.id === layerId
+                    ? {
+                        ...l,
+                        x: l.originalTransform!.x,
+                        y: l.originalTransform!.y,
+                        width: l.originalTransform!.width,
+                        height: l.originalTransform!.height,
+                        rotation: l.originalTransform!.rotation,
+                        data: l.originalTransform!.data || l.data,
+                      }
+                    : l,
+                ),
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
               }
             : p,
         ),

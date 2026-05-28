@@ -28,7 +28,12 @@ export class RasterLayer {
     let lCanvas = layerCanvasCache.get(layer.id);
 
     // If not in cache and we have data, try to load it
-    if (!lCanvas || lCanvas.width !== layer.width || lCanvas.height !== layer.height) {
+    if (
+      !lCanvas ||
+      lCanvas.width !== layer.width ||
+      lCanvas.height !== layer.height ||
+      (lCanvas as any)._dataUrl !== layer.data
+    ) {
       if (layer.data) {
         // Utility to populate cache from an image element
         const populateCache = (image: HTMLImageElement) => {
@@ -36,6 +41,7 @@ export class RasterLayer {
           const cachedCanvas = document.createElement("canvas");
           cachedCanvas.width = layer.width;
           cachedCanvas.height = layer.height;
+          (cachedCanvas as any)._dataUrl = layer.data;
           const cctx = cachedCanvas.getContext("2d")!;
           // Use scaling draw if dimensions don't match exactly (though they should)
           cctx.drawImage(image, 0, 0, layer.width, layer.height);

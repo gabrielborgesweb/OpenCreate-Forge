@@ -14,6 +14,7 @@ import {
   Ungroup,
   Lock,
   Unlock,
+  RotateCcw,
 } from "lucide-react";
 import ContextMenu from "../ui/ContextMenu";
 
@@ -37,6 +38,7 @@ const LayerList: React.FC = () => {
   const toggleGroupExpansion = useProjectStore((state) => state.toggleGroupExpansion);
   const convertToSmartObject = useProjectStore((state) => state.convertToSmartObject);
   const rasterizeSmartObject = useProjectStore((state) => state.rasterizeSmartObject);
+  const resetSmartObjectTransform = useProjectStore((state) => state.resetSmartObjectTransform);
 
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
   const [visibilityDrag, setVisibilityDrag] = React.useState<{
@@ -457,6 +459,11 @@ const LayerList: React.FC = () => {
 
             ...(contextMenu.layer.type === "smart_object"
               ? [
+                  {
+                    label: "Reset Transform",
+                    icon: RotateCcw,
+                    onClick: () => resetSmartObjectTransform(project.id, contextMenu.layer.id),
+                  },
                   {
                     label: "Rasterize Layer",
                     icon: ImageIcon,

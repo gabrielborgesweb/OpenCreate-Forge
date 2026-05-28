@@ -82,7 +82,11 @@ export class EraserTool extends BaseTool {
     if (!layer) return;
 
     if (layer.type !== "raster") {
-      useUIStore.getState().showToast("Cannot erase on a non-raster layer", "warning");
+      if (layer.type === "smart_object") {
+        useUIStore.getState().showToast("Cannot erase on a smart object. Double-click to edit its content.", "warning");
+      } else {
+        useUIStore.getState().showToast("Cannot erase on a non-raster layer", "warning");
+      }
       return;
     }
 
