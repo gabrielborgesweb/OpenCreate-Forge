@@ -303,7 +303,7 @@ export class ForgeEngine {
           const onDone = async () => {
             img?.removeEventListener("load", onDone);
             img?.removeEventListener("error", onDone);
-            
+
             // Wait for decoding to ensure it's ready for canvas drawing
             try {
               if (img?.decode) await img.decode();
@@ -435,7 +435,7 @@ export class ForgeEngine {
    * Handles a request for a project thumbnail.
    */
   private handleRequestThumbnail = async (e: any) => {
-    const { callback, size = 150 } = e.detail;
+    const { callback, size = 200 } = e.detail;
     if (this.project) {
       const dataURL = await this.generateThumbnail(size);
       callback(dataURL);
@@ -445,7 +445,7 @@ export class ForgeEngine {
   /**
    * Generates a square thumbnail of the current project.
    */
-  public async generateThumbnail(size: number = 150): Promise<string> {
+  public async generateThumbnail(size: number = 200): Promise<string> {
     if (!this.project) return "";
 
     await this.preloadImages();
@@ -480,7 +480,7 @@ export class ForgeEngine {
 
     thumbCtx.drawImage(this.projectBuffer, drawX, drawY, drawW, drawH);
 
-    return thumbCanvas.toDataURL("image/jpeg", 0.8);
+    return thumbCanvas.toDataURL("image/jpeg", 0.9);
   }
 
   /**
