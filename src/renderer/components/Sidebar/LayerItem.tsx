@@ -13,6 +13,7 @@ import {
   Folder,
   FolderOpen,
   ChevronRight,
+  Box,
   // ChevronDown,
   // Trash2,
   // Copy
@@ -33,6 +34,7 @@ interface LayerItemProps {
   onVisibilityMouseDown: (e: React.MouseEvent, layerId: string) => void;
   onVisibilityMouseEnter: (e: React.MouseEvent, layerId: string) => void;
   onToggleExpansion: (projectId: string, layerId: string) => void;
+  onContextMenu: (e: React.MouseEvent, layer: Layer) => void;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
@@ -50,6 +52,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   onVisibilityMouseDown,
   onVisibilityMouseEnter,
   onToggleExpansion,
+  onContextMenu,
 }) => {
   const renameLayer = useProjectStore((state) => state.renameLayer);
   const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
@@ -212,6 +215,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={() => setDropPosition(null)}
       onDrop={handleDrop}
+      onContextMenu={(e) => onContextMenu(e, layer)}
     >
       {/* Visibility Toggle */}
       <button
@@ -257,7 +261,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
         </button>
       ) : layer.data ? (
         <div
-          className={`w-8 h-8 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
+          className={`w-8 h-8 bg-[#333] relative rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
           onClick={handleThumbnailClick}
         >
           <img
@@ -265,6 +269,12 @@ const LayerItem: React.FC<LayerItemProps> = ({
             alt=""
             className="max-w-full max-h-full object-contain pointer-events-none"
           />
+
+          {layer.type === "smart_object" && (
+            <div className="absolute right-0 bottom-0 w-4 h-4 bg-bg-secondary text-text rounded-tl flex items-center justify-center">
+              <Box size={12} />
+            </div>
+          )}
         </div>
       ) : (
         <div

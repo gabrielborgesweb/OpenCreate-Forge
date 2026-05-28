@@ -4,7 +4,18 @@
 import React from "react";
 import { useProjectStore, Layer } from "@store/projectStore";
 import LayerItem from "./LayerItem";
-import { Plus, Trash2, Copy, Folder } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Copy,
+  Folder,
+  Box,
+  Image as ImageIcon,
+  Ungroup,
+  Lock,
+  Unlock,
+} from "lucide-react";
+import ContextMenu from "../ui/ContextMenu";
 
 const LayerList: React.FC = () => {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -24,11 +35,19 @@ const LayerList: React.FC = () => {
   const groupLayers = useProjectStore((state) => state.groupLayers);
   const ungroupLayers = useProjectStore((state) => state.ungroupLayers);
   const toggleGroupExpansion = useProjectStore((state) => state.toggleGroupExpansion);
+  const convertToSmartObject = useProjectStore((state) => state.convertToSmartObject);
+  const rasterizeSmartObject = useProjectStore((state) => state.rasterizeSmartObject);
 
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
   const [visibilityDrag, setVisibilityDrag] = React.useState<{
     targetVisible: boolean;
     changedAny: boolean;
+  } | null>(null);
+
+  const [contextMenu, setContextMenu] = React.useState<{
+    x: number;
+    y: number;
+    layer: Layer;
   } | null>(null);
 
   // Global keyboard shortcuts for LayerList
@@ -271,6 +290,22 @@ const LayerList: React.FC = () => {
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent, layer: Layer) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // If the layer is not part of the selection, select it
+    if (!project.selectedLayerIds.includes(layer.id)) {
+      setSelectedLayers(project.id, [layer.id]);
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      layer,
+    });
+  };
+
   const getDisplayLayers = () => {
     const displayLayers: { layer: Layer; depth: number; actualIndex: number }[] = [];
 
@@ -284,7 +319,7 @@ const LayerList: React.FC = () => {
       let currentParentId = layer.parentId;
       let depth = 0;
 
-      while (currentParentId) {
+      while (currentParentId && layer.type !== "smart_object") {
         depth++;
         const parent = project.layers.find((l) => l.id === currentParentId);
         if (parent && !parent.isExpanded) {
@@ -337,6 +372,7 @@ const LayerList: React.FC = () => {
             onVisibilityMouseDown={handleVisibilityMouseDown}
             onVisibilityMouseEnter={handleVisibilityMouseEnter}
             onToggleExpansion={toggleGroupExpansion}
+            onContextMenu={handleContextMenu}
           />
         ))}
       </div>
@@ -375,6 +411,68 @@ const LayerList: React.FC = () => {
           <Trash2 size={16} />
         </button>
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: "Duplicate Layer",
+              icon: Copy,
+              onClick: () => duplicateLayer(project.id, contextMenu.layer.id),
+            },
+            {
+              label: contextMenu.layer.locked ? "Unlock Layer" : "Lock Layer",
+              icon: contextMenu.layer.locked ? Unlock : Lock,
+              onClick: () =>
+                updateLayer(project.id, contextMenu.layer.id, {
+                  locked: !contextMenu.layer.locked,
+                }),
+            },
+            {
+              label: "Delete Layer",
+              icon: Trash2,
+              danger: true,
+              onClick: () => removeLayer(project.id, contextMenu.layer.id),
+            },
+            { isSeparator: true },
+            ...(contextMenu.layer.type === "group"
+              ? [
+                  {
+                    label: "Ungroup Layer(s)",
+                    icon: Ungroup,
+                    onClick: () => ungroupLayers(project.id, contextMenu.layer.id),
+                  },
+                ]
+              : [
+                  {
+                    label: "Group Layer(s)",
+                    icon: Folder,
+                    onClick: () => groupLayers(project.id, project.selectedLayerIds),
+                  },
+                ]),
+            { isSeparator: true },
+
+            ...(contextMenu.layer.type === "smart_object"
+              ? [
+                  {
+                    label: "Rasterize Layer",
+                    icon: ImageIcon,
+                    onClick: () => rasterizeSmartObject(project.id, contextMenu.layer.id),
+                  },
+                ]
+              : [
+                  {
+                    label: "Convert to Smart Object",
+                    icon: Box,
+                    onClick: () => convertToSmartObject(project.id, project.selectedLayerIds),
+                  },
+                ]),
+          ]}
+        />
+      )}
     </div>
   );
 };

@@ -29,7 +29,7 @@ export interface Layer {
   /** Display name of the layer. */
   name: string;
   /** The type of layer content. */
-  type: "raster" | "text" | "group";
+  type: "raster" | "text" | "group" | "smart_object";
   /** Whether the layer is currently visible. */
   visible: boolean;
   /** Whether the layer is locked for editing. */
@@ -44,8 +44,18 @@ export interface Layer {
   width: number;
   /** Height of the layer in pixels. */
   height: number;
-  /** Base64 encoded image data for raster layers. */
+  /** Base64 encoded image data for raster layers or flattened smart objects. */
   data?: string;
+  /** Nested project data for smart objects. */
+  dataObject?: Project;
+  /** Original transformation for smart objects (used for reset). */
+  originalTransform?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+  };
   /** Raw text content for text layers. */
   text?: string;
   /** Styled text spans for rich text support. */
@@ -219,6 +229,10 @@ interface ProjectState {
   ungroupLayers: (projectId: string, groupId: string) => void;
   /** Toggles group expansion in the UI. */
   toggleGroupExpansion: (projectId: string, groupId: string) => void;
+  /** Converts specified layers into a Smart Object. */
+  convertToSmartObject: (projectId: string, layerIds: string[]) => Promise<void>;
+  /** Rasterizes a Smart Object layer. */
+  rasterizeSmartObject: (projectId: string, layerId: string) => void;
   /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
   /** Sets the selected layers for a project. */
@@ -322,7 +336,7 @@ export const getSerializableProject = (project: Project): any => {
   };
 };
 
-export const useProjectStore = create<ProjectState>((set, _get) => ({
+export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   activeProjectId: null,
   appVersion: "0.0.0",
@@ -902,6 +916,226 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
           : p,
       ),
     })),
+
+  convertToSmartObject: async (projectId, layerIds) => {
+    const state = get();
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project || layerIds.length === 0) return;
+
+    // Helper to get all descendants recursively
+    const getAllDescendants = (parentId: string): string[] => {
+      const children = project.layers.filter((l) => l.parentId === parentId);
+      let descendants = children.map((l) => l.id);
+      children.forEach((child) => {
+        if (child.type === "group") {
+          descendants = [...descendants, ...getAllDescendants(child.id)];
+        }
+      });
+      return descendants;
+    };
+
+    const movingLayerIds = new Set(layerIds);
+    layerIds.forEach((id) => {
+      const layer = project.layers.find((l) => l.id === id);
+      if (layer?.type === "group") {
+        getAllDescendants(id).forEach((descId) => movingLayerIds.add(descId));
+      }
+    });
+
+    const selectedLayers = project.layers.filter((l) => movingLayerIds.has(l.id));
+    if (selectedLayers.length === 0) return;
+
+    // Calculate bounding box of all selected layers (including groups)
+    // Filter out groups for bounds calculation if they don't have explicit size,
+    // but in our engine groups usually have 0,0 size unless calculated.
+    // If only groups with 0 size, we might need to calculate their content bounds
+    // For now, let's assume we use all layers that have x,y,width,height
+    const layersWithBounds = selectedLayers.filter((l) => l.type !== "group");
+
+    let minX, minY, maxX, maxY;
+
+    if (layersWithBounds.length > 0) {
+      minX = Math.min(...layersWithBounds.map((l) => l.x));
+      minY = Math.min(...layersWithBounds.map((l) => l.y));
+      maxX = Math.max(...layersWithBounds.map((l) => l.x + l.width));
+      maxY = Math.max(...layersWithBounds.map((l) => l.y + l.height));
+    } else {
+      // Fallback to groups or default
+      minX = Math.min(...selectedLayers.map((l) => l.x));
+      minY = Math.min(...selectedLayers.map((l) => l.y));
+      maxX = Math.max(...selectedLayers.map((l) => l.x + l.width));
+      maxY = Math.max(...selectedLayers.map((l) => l.y + l.height));
+    }
+
+    const width = Math.max(1, Math.ceil(maxX - minX));
+    const height = Math.max(1, Math.ceil(maxY - minY));
+
+    const smartObjectId = Math.random().toString(36).substr(2, 9);
+
+    // Create a preview by rendering the layers to a temporary canvas
+    const previewCanvas = document.createElement("canvas");
+    previewCanvas.width = width;
+    previewCanvas.height = height;
+    const previewCtx = previewCanvas.getContext("2d")!;
+
+    // Basic rendering for preview
+    for (const layer of selectedLayers) {
+      if (!layer.visible) continue;
+
+      previewCtx.save();
+      previewCtx.globalAlpha = layer.opacity / 100;
+      previewCtx.globalCompositeOperation = layer.blendMode;
+
+      if (layer.type === "raster" && layer.data) {
+        const img = new Image();
+        img.src = layer.data;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        previewCtx.drawImage(img, layer.x - minX, layer.y - minY, layer.width, layer.height);
+      } else if (layer.type === "text" && layer.text) {
+        // Simple text preview (can be improved later with full TextLayer logic)
+        previewCtx.fillStyle = layer.color || "white";
+        previewCtx.font = `${layer.fontWeight || "normal"} ${layer.fontSize || 20}px ${layer.fontFamily || "sans-serif"}`;
+        previewCtx.textBaseline = "top";
+        previewCtx.fillText(layer.text, layer.x - minX, layer.y - minY);
+      } else if (layer.type === "smart_object" && layer.data) {
+        // Recursively render smart objects if they have data
+        const img = new Image();
+        img.src = layer.data;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        previewCtx.drawImage(img, layer.x - minX, layer.y - minY, layer.width, layer.height);
+      }
+
+      previewCtx.restore();
+    }
+
+    const dataURL = previewCanvas.toDataURL();
+
+    const nestedLayers: Layer[] = selectedLayers.map((l) => ({
+      ...JSON.parse(JSON.stringify(l)),
+      x: l.x - minX,
+      y: l.y - minY,
+      parentId: l.parentId && movingLayerIds.has(l.parentId) ? l.parentId : null,
+    }));
+
+    const dataObject: Project = {
+      id: smartObjectId,
+      name: selectedLayers.length === 1 ? selectedLayers[0].name : "Smart Object Content",
+      width,
+      height,
+      layers: nestedLayers,
+      activeLayerId: nestedLayers[0].id,
+      selectedLayerIds: [nestedLayers[0].id],
+      selection: { hasSelection: false, bounds: null },
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    };
+
+    const smartLayer: Layer = {
+      id: smartObjectId,
+      name: selectedLayers.length === 1 ? `${selectedLayers[0].name}` : "Smart Object",
+      type: "smart_object",
+      visible: true,
+      locked: false,
+      opacity: 100,
+      x: minX,
+      y: minY,
+      width,
+      height,
+      data: dataURL,
+      dataObject,
+      blendMode: "source-over",
+      originalTransform: {
+        x: minX,
+        y: minY,
+        width,
+        height,
+        rotation: 0,
+      },
+      parentId: selectedLayers[0].parentId || null,
+    };
+
+    // Push to history
+    const historyState = createHistoryState(project);
+    const newUndoStack = [
+      ...project.undoStack,
+      { description: "Convert to Smart Object", state: historyState },
+    ];
+    if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+    // Replace selected layers with the new smart object layer
+    // Find the highest index among selected layers to insert the smart object
+    const indices = selectedLayers.map((l) => project.layers.indexOf(l));
+    const targetIndex = Math.max(...indices);
+
+    const remainingLayers = project.layers.filter((l) => !movingLayerIds.has(l.id));
+    const adjustedTargetIndex = project.layers
+      .slice(0, targetIndex + 1)
+      .filter((l) => !movingLayerIds.has(l.id)).length;
+
+    const newLayers = [...remainingLayers];
+    newLayers.splice(adjustedTargetIndex, 0, smartLayer);
+
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              layers: newLayers,
+              activeLayerId: smartObjectId,
+              selectedLayerIds: [smartObjectId],
+              isDirty: true,
+              undoStack: newUndoStack,
+              redoStack: [],
+            }
+          : p,
+      ),
+    }));
+  },
+
+  rasterizeSmartObject: (projectId, layerId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const layer = project.layers.find((l) => l.id === layerId);
+      if (!layer || layer.type !== "smart_object") return state;
+
+      const historyState = createHistoryState(project);
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Rasterize Smart Object", state: historyState },
+      ];
+      if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: p.layers.map((l) =>
+                  l.id === layerId
+                    ? { ...l, type: "raster", dataObject: undefined, parentId: null }
+                    : l,
+                ),
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+                parentId: null,
+              }
+            : p,
+        ),
+      };
+    }),
 
   undoText: (projectId, layerId) =>
     set((state) => ({

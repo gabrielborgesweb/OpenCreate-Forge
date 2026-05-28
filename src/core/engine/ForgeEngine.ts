@@ -23,6 +23,7 @@ import {
 import { RasterLayer } from "../layers/RasterLayer";
 import { TextLayer } from "../layers/TextLayer";
 import { GroupLayer } from "../layers/GroupLayer";
+import { SmartObjectLayer } from "../layers/SmartObjectLayer";
 
 /**
  * Represents the current state of the canvas viewport.
@@ -1682,6 +1683,16 @@ export class ForgeEngine {
           break;
         case "group":
           GroupLayer.render(ctx, renderLayerTarget);
+          break;
+        case "smart_object":
+          SmartObjectLayer.render(
+            ctx,
+            renderLayerTarget,
+            this.layerCanvasCache,
+            this.layerReadyCache,
+            this.imageCache,
+            () => this.render(),
+          );
           break;
       }
     }
