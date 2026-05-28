@@ -2,7 +2,7 @@
  * Purpose: Tool for moving layers and selections, including auto-selection logic and support for floating selections.
  */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
-import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
+import { createHistoryState, HistoryState, Layer } from "@/renderer/store/projectStore";
 
 export class MoveTool extends BaseTool {
   id: ToolId = "move";
@@ -10,11 +10,59 @@ export class MoveTool extends BaseTool {
   private isDragging = false;
   private startX = 0;
   private startY = 0;
-  private initialLayerX = 0;
-  private initialLayerY = 0;
-  private layerId: string | null = null;
+  private initialPositions: Map<string, { x: number; y: number }> = new Map();
+  private movingLayerIds: string[] = [];
   private isFloating = false;
   private historySnapshot: HistoryState | null = null;
+
+  /**
+   * Recursively finds all descendants of a group layer.
+   */
+  private getDescendantIds(layers: Layer[], parentId: string): string[] {
+    const descendants: string[] = [];
+    const children = layers.filter((l) => l.parentId === parentId);
+    for (const child of children) {
+      descendants.push(child.id);
+      if (child.type === "group") {
+        descendants.push(...this.getDescendantIds(layers, child.id));
+      }
+    }
+    return descendants;
+  }
+
+  /**
+   * Identifies all layers that should move based on current selection and hierarchy.
+   */
+  private getTargetLayerIds(context: ToolContext): string[] {
+    const { project } = context;
+    const targets = new Set<string>();
+
+    // 1. Start with selected layers
+    const selectedIds =
+      project.selectedLayerIds.length > 0
+        ? project.selectedLayerIds
+        : project.activeLayerId
+          ? [project.activeLayerId]
+          : [];
+
+    for (const id of selectedIds) {
+      const layer = project.layers.find((l) => l.id === id);
+      if (!layer) continue;
+
+      targets.add(id);
+
+      // 2. If it's a group, add all descendants
+      if (layer.type === "group") {
+        const descendants = this.getDescendantIds(project.layers, id);
+        for (const dId of descendants) {
+          targets.add(dId);
+        }
+      }
+    }
+
+    // 3. Filter out locked layers (including those with locked ancestors)
+    return Array.from(targets).filter((id) => !context.isLayerLocked(id));
+  }
 
   async onMouseDown(e: MouseEvent, context: ToolContext): Promise<void> {
     if (e.button !== 0) return;
@@ -37,29 +85,28 @@ export class MoveTool extends BaseTool {
             y <= l.y + l.height,
         );
 
-      if (foundLayer && foundLayer.id !== project.activeLayerId) {
-        context.updateProject({ activeLayerId: foundLayer.id });
+      if (foundLayer && !project.selectedLayerIds.includes(foundLayer.id)) {
+        context.updateProject({ activeLayerId: foundLayer.id, selectedLayerIds: [foundLayer.id] });
         // Update local reference for the rest of the method
         project.activeLayerId = foundLayer.id;
+        project.selectedLayerIds = [foundLayer.id];
       }
     }
 
     const activeLayerId = project.activeLayerId;
-    if (!activeLayerId) return;
-
-    if (context.isLayerLocked(activeLayerId)) return;
-
-    const layer = project.layers.find((l) => l.id === activeLayerId);
-    if (!layer) return;
+    if (!activeLayerId && project.selectedLayerIds.length === 0) return;
 
     // Capture snapshot BEFORE any changes
     this.historySnapshot = createHistoryState(project);
 
     // If we have a selection and no floating layer yet, we float it now
-    if (project.selection.hasSelection && !project.selection.floatingLayer) {
-      const success = await context.floatSelection(activeLayerId);
-      if (success) {
-        this.isFloating = true;
+    // Selection floating currently only supports the active layer
+    if (activeLayerId && project.selection.hasSelection && !project.selection.floatingLayer) {
+      if (!context.isLayerLocked(activeLayerId)) {
+        const success = await context.floatSelection(activeLayerId);
+        if (success) {
+          this.isFloating = true;
+        }
       }
     } else if (project.selection.floatingLayer) {
       this.isFloating = true;
@@ -68,18 +115,27 @@ export class MoveTool extends BaseTool {
     }
 
     this.isDragging = true;
-    this.layerId = this.isFloating ? "floating-selection" : activeLayerId;
-
-    const targetLayer = this.isFloating ? context.project.selection.floatingLayer! : layer;
-
     this.startX = x;
     this.startY = y;
-    this.initialLayerX = targetLayer.x;
-    this.initialLayerY = targetLayer.y;
+    this.initialPositions.clear();
+
+    if (this.isFloating) {
+      const floatingLayer = context.project.selection.floatingLayer!;
+      this.movingLayerIds = ["floating-selection"];
+      this.initialPositions.set("floating-selection", { x: floatingLayer.x, y: floatingLayer.y });
+    } else {
+      this.movingLayerIds = this.getTargetLayerIds(context);
+      for (const id of this.movingLayerIds) {
+        const layer = project.layers.find((l) => l.id === id);
+        if (layer) {
+          this.initialPositions.set(id, { x: layer.x, y: layer.y });
+        }
+      }
+    }
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
-    if (!this.isDragging || !this.layerId) return;
+    if (!this.isDragging || this.movingLayerIds.length === 0) return;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     // Use Math.round to force movement to project pixels (no subpixels)
@@ -88,11 +144,12 @@ export class MoveTool extends BaseTool {
 
     if (this.isFloating) {
       const floatingLayer = context.project.selection.floatingLayer;
-      if (floatingLayer) {
+      const initial = this.initialPositions.get("floating-selection");
+      if (floatingLayer && initial) {
         const newFloating = {
           ...floatingLayer,
-          x: this.initialLayerX + dx,
-          y: this.initialLayerY + dy,
+          x: initial.x + dx,
+          y: initial.y + dy,
         };
         context.updateProject({
           selection: {
@@ -100,8 +157,8 @@ export class MoveTool extends BaseTool {
             floatingLayer: newFloating,
             bounds: {
               ...context.project.selection.bounds!,
-              x: this.initialLayerX + dx,
-              y: this.initialLayerY + dy,
+              x: initial.x + dx,
+              y: initial.y + dy,
             },
           },
         });
@@ -109,11 +166,12 @@ export class MoveTool extends BaseTool {
       }
     } else {
       const layers = context.project.layers.map((l) => {
-        if (l.id === this.layerId) {
+        const initial = this.initialPositions.get(l.id);
+        if (initial) {
           return {
             ...l,
-            x: this.initialLayerX + dx,
-            y: this.initialLayerY + dy,
+            x: initial.x + dx,
+            y: initial.y + dy,
           };
         }
         return l;
@@ -140,7 +198,8 @@ export class MoveTool extends BaseTool {
 
       context.updateProject({ isDirty: true });
     }
-    this.layerId = null;
+    this.movingLayerIds = [];
+    this.initialPositions.clear();
     this.historySnapshot = null;
   }
 
@@ -149,10 +208,8 @@ export class MoveTool extends BaseTool {
     if (!isArrow) return false;
 
     const { project } = context;
-    const activeLayerId = project.activeLayerId;
-    if (!activeLayerId) return false;
-
-    if (context.isLayerLocked(activeLayerId)) return false;
+    const targetIds = this.getTargetLayerIds(context);
+    if (targetIds.length === 0) return false;
 
     e.preventDefault();
 
@@ -166,9 +223,10 @@ export class MoveTool extends BaseTool {
     if (e.key === "ArrowDown") dy = 1 * multiplier;
 
     const history = createHistoryState(project);
+    const targetSet = new Set(targetIds);
 
     const layers = project.layers.map((l) => {
-      if (l.id === activeLayerId) {
+      if (targetSet.has(l.id)) {
         return { ...l, x: l.x + dx, y: l.y + dy };
       }
       return l;
