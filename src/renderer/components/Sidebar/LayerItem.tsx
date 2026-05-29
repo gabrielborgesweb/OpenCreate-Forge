@@ -12,8 +12,8 @@ import {
   Unlock,
   Folder,
   FolderOpen,
-  ChevronRight,
   Box,
+  // ChevronRight,
   // ChevronDown,
   // Trash2,
   // Copy
@@ -237,7 +237,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
       </button>
 
       {/* Group Expansion Toggle */}
-      {layer.type === "group" && (
+      {/* {layer.type === "group" && (
         <button
           className="p-1"
           onClick={(e) => {
@@ -245,21 +245,20 @@ const LayerItem: React.FC<LayerItemProps> = ({
             onToggleExpansion(projectId, layer.id);
           }}
         >
-          {/* {layer.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} */}
           <ChevronRight
             size={14}
             className="transition-all"
             style={{ rotate: layer.isExpanded ? "90deg" : "0deg" }}
           />
         </button>
-      )}
+      )} */}
 
       {/* Thumbnail or Icon */}
       {layer.type === "group" ? (
         <button
-          className="p-1 text-text mr-2"
-          onDoubleClick={() => {
-            // toggle expand or collapse on double click
+          className="p-2 py-1 text-text"
+          onClick={() => {
+            // toggle expand or collapse on click
             onToggleExpansion(projectId, layer.id);
           }}
         >
