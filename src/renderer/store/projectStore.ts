@@ -205,6 +205,8 @@ interface ProjectState {
   addLayer: (projectId: string, layer: Partial<Layer>, skipHistory?: boolean) => void;
   /** Removes a layer from a specific project. */
   removeLayer: (projectId: string, layerId: string, skipHistory?: boolean) => void;
+  /** Removes multiple layers from a specific project. */
+  removeLayers: (projectId: string, layerIds: string[], skipHistory?: boolean) => void;
   /** Adds a manual entry to the project's history stack. */
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
   /** Reorders layers in the project stack. */
@@ -216,6 +218,8 @@ interface ProjectState {
   ) => void;
   /** Duplicates an existing layer. */
   duplicateLayer: (projectId: string, layerId: string) => void;
+  /** Duplicates multiple existing layers. */
+  duplicateLayers: (projectId: string, layerIds: string[]) => void;
   /** Updates properties of a specific layer. */
   updateLayer: (
     projectId: string,
@@ -498,27 +502,63 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       };
     }),
 
-  removeLayer: (projectId, layerId, skipHistory = false) =>
+  removeLayer: (projectId, layerId, skipHistory = false) => {
+    get().removeLayers(projectId, [layerId], skipHistory);
+  },
+
+  removeLayers: (projectId, layerIds, skipHistory = false) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project || project.layers.length <= 1) return state;
+
+      // Identify all layers to remove, including descendants of groups
+      const layersToRemove = new Set<string>();
+      const findDescendants = (parentId: string) => {
+        project.layers
+          .filter((l) => l.parentId === parentId)
+          .forEach((l) => {
+            layersToRemove.add(l.id);
+            if (l.type === "group") findDescendants(l.id);
+          });
+      };
+
+      layerIds.forEach((id) => {
+        layersToRemove.add(id);
+        const layer = project.layers.find((l) => l.id === id);
+        if (layer?.type === "group") findDescendants(id);
+      });
+
+      // Prevent removing all layers
+      if (layersToRemove.size >= project.layers.length) {
+        // Find one layer that is NOT being removed to keep as fallback
+        const fallback = project.layers.find((l) => !layersToRemove.has(l.id));
+        if (!fallback) return state; // Should not happen if we check layers.length > 1
+      }
 
       let newUndoStack = project.undoStack;
 
       if (!skipHistory) {
         const historyState = createHistoryState(project);
-        newUndoStack = [...project.undoStack, { description: "Remove Layer", state: historyState }];
+        newUndoStack = [
+          ...project.undoStack,
+          {
+            description: layersToRemove.size > 1 ? "Remove Layers" : "Remove Layer",
+            state: historyState,
+          },
+        ];
         if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
       }
 
-      const newLayers = project.layers.filter((l) => l.id !== layerId);
+      const newLayers = project.layers.filter((l) => !layersToRemove.has(l.id));
+
       let newActiveLayerId = project.activeLayerId;
-      if (project.activeLayerId === layerId) {
-        const index = project.layers.findIndex((l) => l.id === layerId);
-        newActiveLayerId = newLayers[Math.max(0, index - 1)]?.id || null;
+      if (project.activeLayerId && layersToRemove.has(project.activeLayerId)) {
+        // Find index of the first layer being removed among original layers
+        const firstRemovedIndex = project.layers.findIndex((l) => layersToRemove.has(l.id));
+        newActiveLayerId = newLayers[Math.max(0, firstRemovedIndex - 1)]?.id || null;
       }
 
-      const newSelectedLayerIds = project.selectedLayerIds.filter((id) => id !== layerId);
+      const newSelectedLayerIds = project.selectedLayerIds.filter((id) => !layersToRemove.has(id));
       if (newSelectedLayerIds.length === 0 && newActiveLayerId) {
         newSelectedLayerIds.push(newActiveLayerId);
       }
@@ -557,47 +597,119 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       };
     }),
 
-  duplicateLayer: (projectId: string, layerId: string) =>
+  duplicateLayer: (projectId: string, layerId: string) => {
+    get().duplicateLayers(projectId, [layerId]);
+  },
+
+  duplicateLayers: (projectId: string, layerIds: string[]) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
 
-      const layer = project.layers.find((l) => l.id === layerId);
-      if (!layer) return state;
+      // Filter and sort target layers by their index to maintain relative order
+      const targetIds = new Set(layerIds);
+      const targets = project.layers
+        .map((l, index) => ({ l, index }))
+        .filter((item) => targetIds.has(item.l.id))
+        .sort((a, b) => a.index - b.index); // Process from bottom to top
+
+      if (targets.length === 0) return state;
 
       // Push to history
       const historyState = createHistoryState(project);
       const newUndoStack = [
         ...project.undoStack,
-        { description: "Duplicate Layer", state: historyState },
+        {
+          description: targets.length > 1 ? "Duplicate Layers" : "Duplicate Layer",
+          state: historyState,
+        },
       ];
       if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
 
-      const newId = Math.random().toString(36).substr(2, 9);
-      const newLayer = {
-        ...JSON.parse(JSON.stringify(layer)),
-        id: newId,
-        name: `${layer.name} copy`,
-      };
-      const index = project.layers.findIndex((l) => l.id === layerId);
+      const newlyCreatedIds: string[] = [];
+      const allNewClones: Layer[] = [];
+      let maxInsertionIndex = -1;
+
+      targets.forEach(({ l: layerToDuplicate, index }) => {
+        const idMap = new Map<string, string>();
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        const cloneLayer = (layer: Layer, newParentId: string | null): Layer => {
+          const newId = generateId();
+          idMap.set(layer.id, newId);
+          return {
+            ...JSON.parse(JSON.stringify(layer)),
+            id: newId,
+            parentId: newParentId,
+            name: !newParentId ? `${layer.name} copy` : layer.name, // Only suffix top-level duplicates
+          };
+        };
+
+        // 1. Identify all descendants if it's a group
+        const descendantsToClone: Layer[] = [];
+        const findDescendants = (parentId: string) => {
+          project.layers
+            .filter((l) => l.parentId === parentId)
+            .forEach((l) => {
+              descendantsToClone.push(l);
+              if (l.type === "group") findDescendants(l.id);
+            });
+        };
+
+        if (layerToDuplicate.type === "group") {
+          findDescendants(layerToDuplicate.id);
+        }
+
+        // 2. Clone the main layer
+        const clonedMain = cloneLayer(layerToDuplicate, layerToDuplicate.parentId || null);
+        newlyCreatedIds.push(clonedMain.id);
+
+        // 3. Clone descendants and update their parentIds
+        const clonedDescendants = descendantsToClone.map((d) => {
+          const newParentId = idMap.get(d.parentId!) || clonedMain.id;
+          return cloneLayer(d, newParentId);
+        });
+
+        // 4. Collect clones and track the highest index for insertion
+        allNewClones.push(clonedMain, ...clonedDescendants);
+
+        let lastDescendantIndex = index;
+        if (descendantsToClone.length > 0) {
+          const descendantIds = new Set(descendantsToClone.map((d) => d.id));
+          for (let i = index + 1; i < project.layers.length; i++) {
+            if (descendantIds.has(project.layers[i].id)) {
+              lastDescendantIndex = i;
+            } else {
+              break;
+            }
+          }
+        }
+        maxInsertionIndex = Math.max(maxInsertionIndex, lastDescendantIndex);
+      });
 
       const newLayers = [...project.layers];
-      newLayers.splice(index + 1, 0, newLayer);
+      newLayers.splice(maxInsertionIndex + 1, 0, ...allNewClones);
 
       return {
-        projects: state.projects.map((p) =>
-          p.id === projectId
-            ? {
-                ...p,
-                layers: newLayers,
-                activeLayerId: newId,
-                selectedLayerIds: [newId],
-                isDirty: true,
-                undoStack: newUndoStack,
-                redoStack: [],
-              }
-            : p,
-        ),
+        projects: state.projects.map((p) => {
+          if (p.id !== projectId) return p;
+
+          // Sort newly created IDs by their index in the new layers array to maintain consistency
+          const idToIndex = new Map(newLayers.map((l, i) => [l.id, i]));
+          const sortedNewIds = [...newlyCreatedIds].sort(
+            (a, b) => (idToIndex.get(a) || 0) - (idToIndex.get(b) || 0),
+          );
+
+          return {
+            ...p,
+            layers: newLayers,
+            activeLayerId: sortedNewIds[sortedNewIds.length - 1], // Active top-most new layer
+            selectedLayerIds: sortedNewIds,
+            isDirty: true,
+            undoStack: newUndoStack,
+            redoStack: [],
+          };
+        }),
       };
     }),
 

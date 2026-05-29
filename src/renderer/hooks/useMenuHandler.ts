@@ -16,7 +16,7 @@ export const useMenuHandler = () => {
   const redo = useProjectStore((state) => state.redo);
   const addLayer = useProjectStore((state) => state.addLayer);
   const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
-  const removeLayer = useProjectStore((state) => state.removeLayer);
+  const removeLayers = useProjectStore((state) => state.removeLayers);
   const syncSmartObject = useProjectStore((state) => state.syncSmartObject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const showToast = useUIStore((state) => state.showToast);
@@ -274,12 +274,12 @@ export const useMenuHandler = () => {
           break;
 
         case "remove-layer":
-          if (activeProjectId && activeProject?.activeLayerId) {
+          if (activeProjectId && activeProject && (activeProject.selectedLayerIds?.length ?? 0) > 0) {
             // Safety: Don't delete layer if typing in an input or textarea
             if (isInputFocused) {
               return;
             }
-            removeLayer(activeProjectId, activeProject.activeLayerId);
+            removeLayers(activeProjectId, activeProject.selectedLayerIds);
           }
           break;
 
@@ -351,7 +351,7 @@ export const useMenuHandler = () => {
     redo,
     addLayer,
     duplicateLayer,
-    removeLayer,
+    removeLayers,
     setActiveTab,
     showToast,
     showRulers,

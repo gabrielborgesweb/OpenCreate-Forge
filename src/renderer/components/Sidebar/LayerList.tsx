@@ -24,8 +24,8 @@ const LayerList: React.FC = () => {
     (state) => state.projects.find((p) => p.id === activeProjectId) || null,
   );
   const addLayer = useProjectStore((state) => state.addLayer);
-  const removeLayer = useProjectStore((state) => state.removeLayer);
-  const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
+  const removeLayers = useProjectStore((state) => state.removeLayers);
+  const duplicateLayers = useProjectStore((state) => state.duplicateLayers);
   const reorderLayers = useProjectStore((state) => state.reorderLayers);
   const setSelectedLayers = useProjectStore((state) => state.setSelectedLayers);
   const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
@@ -265,8 +265,8 @@ const LayerList: React.FC = () => {
   };
 
   const handleDeleteActiveLayer = () => {
-    if (project.activeLayerId) {
-      removeLayer(project.id, project.activeLayerId);
+    if (project && project.selectedLayerIds.length > 0) {
+      removeLayers(project.id, project.selectedLayerIds);
     }
   };
 
@@ -278,8 +278,8 @@ const LayerList: React.FC = () => {
   };
 
   const handleDuplicateActiveLayer = () => {
-    if (project.activeLayerId) {
-      duplicateLayer(project.id, project.activeLayerId);
+    if (project && project.selectedLayerIds.length > 0) {
+      duplicateLayers(project.id, project.selectedLayerIds);
     }
   };
 
@@ -421,23 +421,27 @@ const LayerList: React.FC = () => {
           onClose={() => setContextMenu(null)}
           items={[
             {
-              label: "Duplicate Layer",
+              label: "Duplicate Layer(s)",
               icon: Copy,
-              onClick: () => duplicateLayer(project.id, contextMenu.layer.id),
+              onClick: () => duplicateLayers(project.id, project.selectedLayerIds),
             },
             {
-              label: contextMenu.layer.locked ? "Unlock Layer" : "Lock Layer",
+              label: contextMenu.layer.locked ? "Unlock Layer(s)" : "Lock Layer(s)",
               icon: contextMenu.layer.locked ? Unlock : Lock,
               onClick: () =>
-                updateLayer(project.id, contextMenu.layer.id, {
-                  locked: !contextMenu.layer.locked,
+                // Lock/Unlock all selected layers based on the state of the right-clicked layer
+                project.selectedLayerIds.forEach((id) => {
+                  const targetLayer = project.layers.find((l) => l.id === id);
+                  if (targetLayer) {
+                    updateLayer(project.id, id, { locked: !contextMenu.layer.locked });
+                  }
                 }),
             },
             {
-              label: "Delete Layer",
+              label: "Delete Layer(s)",
               icon: Trash2,
               danger: true,
-              onClick: () => removeLayer(project.id, contextMenu.layer.id),
+              onClick: () => removeLayers(project.id, project.selectedLayerIds),
             },
             { isSeparator: true },
             ...(contextMenu.layer.type === "group"

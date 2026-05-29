@@ -1931,19 +1931,19 @@ export class ForgeEngine {
   }
 
   /**
-   * Duplicates the active layer or the selection within it.
+   * Duplicates the active layers or the selection within the active layer.
    */
   public async duplicateLayer() {
     if (!this.project || !this.project.activeLayerId) return;
 
-    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
-    if (!activeLayer) return;
-
-    // If there is NO selection, duplicate the entire layer via Store
+    // If there is NO selection, duplicate all selected layers via Store
     if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
-      useProjectStore.getState().duplicateLayer(this.project.id, activeLayer.id);
+      useProjectStore.getState().duplicateLayers(this.project.id, this.project.selectedLayerIds);
       return;
     }
+
+    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
+    if (!activeLayer) return;
 
     // If there IS a selection, perform "Layer via Copy" (Photoshop style)
     if (activeLayer.type !== "raster" || !activeLayer.data) {
