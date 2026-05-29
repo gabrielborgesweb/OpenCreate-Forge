@@ -131,6 +131,9 @@ export class ForgeEngine {
       this.setupEventListeners();
       this.startRenderLoop();
     }
+
+    // Export for DevTools access (for testing/debugging)
+    (window as any).ForgeEngine = this;
   }
 
   private unsubscribeToolStore: (() => void) | null = null;
