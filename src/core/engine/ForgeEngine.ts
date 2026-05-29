@@ -293,15 +293,17 @@ export class ForgeEngine {
       console.warn("Font preloading failed", e);
     }
 
-    // 2. Wait for all raster images to be loaded and decoded
+    // 2. Wait for all raster and smart object images to be loaded and decoded
     const promises = this.project.layers.map(async (layer) => {
-      if (layer.type === "raster" && layer.data) {
+      const sourceData = (layer.type === "smart_object" ? (layer.dataOriginal || layer.data) : layer.data) as string | undefined;
+
+      if ((layer.type === "raster" || layer.type === "smart_object") && sourceData) {
         return new Promise<void>((resolve) => {
-          let img = this.imageCache.get(layer.data!);
+          let img = this.imageCache.get(sourceData);
           if (!img) {
             img = new Image();
-            img.src = layer.data!;
-            this.imageCache.set(layer.data!, img);
+            img.src = sourceData;
+            this.imageCache.set(sourceData, img);
           }
 
           const onDone = async () => {
@@ -1643,15 +1645,35 @@ export class ForgeEngine {
       const transform = useToolStore.getState().toolSettings.transform;
       ctx.translate(transform.x, transform.y);
       ctx.rotate((transform.rotation * Math.PI) / 180);
-      ctx.scale(transform.scaleX, transform.scaleY);
 
-      renderLayerTarget = {
-        ...layer,
-        x: -transform.width * transform.anchor.x,
-        y: -transform.height * transform.anchor.y,
-        rotation: 0,
-      };
-    } else if (layer.rotation) {
+      if (layer.type === "smart_object") {
+        // High-quality preview for Smart Objects: render at transformed size from original data
+        const targetWidth = Math.round(transform.width * Math.abs(transform.scaleX));
+        const targetHeight = Math.round(transform.height * Math.abs(transform.scaleY));
+
+        // Flip context if scale is negative, but SmartObjectLayer will render at targetWidth/Height
+        ctx.scale(transform.scaleX < 0 ? -1 : 1, transform.scaleY < 0 ? -1 : 1);
+
+        renderLayerTarget = {
+          ...layer,
+          width: targetWidth,
+          height: targetHeight,
+          data: layer.dataOriginal || layer.data,
+          x: -targetWidth * transform.anchor.x,
+          y: -targetHeight * transform.anchor.y,
+          rotation: 0,
+        };
+      } else {
+        ctx.scale(transform.scaleX, transform.scaleY);
+        renderLayerTarget = {
+          ...layer,
+          x: -transform.width * transform.anchor.x,
+          y: -transform.height * transform.anchor.y,
+          rotation: 0,
+        };
+      }
+    }
+ else if (layer.rotation) {
       const centerX = layer.x + layer.width / 2;
       const centerY = layer.y + layer.height / 2;
       ctx.translate(centerX, centerY);

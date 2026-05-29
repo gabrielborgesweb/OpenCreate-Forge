@@ -1014,10 +1014,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         previewCtx.font = `${layer.fontWeight || "normal"} ${layer.fontSize || 20}px ${layer.fontFamily || "sans-serif"}`;
         previewCtx.textBaseline = "top";
         previewCtx.fillText(layer.text, layer.x - minX, layer.y - minY);
-      } else if (layer.type === "smart_object" && layer.data) {
-        // Recursively render smart objects if they have data
+      } else if (layer.type === "smart_object" && (layer.dataOriginal || layer.data)) {
+        // Recursively render smart objects if they have data (prefer original for quality)
+        const sourceData = (layer.dataOriginal || layer.data)!;
         const img = new Image();
-        img.src = layer.data;
+        img.src = sourceData;
         await new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = resolve;
@@ -1280,9 +1281,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ctx.font = `${layer.fontWeight || "normal"} ${layer.fontSize || 20}px ${layer.fontFamily || "sans-serif"}`;
         ctx.textBaseline = "top";
         ctx.fillText(layer.text, layer.x, layer.y);
-      } else if (layer.type === "smart_object" && layer.data) {
+      } else if (layer.type === "smart_object" && (layer.dataOriginal || layer.data)) {
+        const sourceData = (layer.dataOriginal || layer.data)!;
         const img = new Image();
-        img.src = layer.data;
+        img.src = sourceData;
         await new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = resolve;
