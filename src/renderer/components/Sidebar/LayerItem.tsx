@@ -181,6 +181,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
     if (e.key === "Enter") handleRename();
     if (e.key === "Escape") {
       setEditName(layer.name);
@@ -305,7 +306,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
           />
         ) : (
           <div
-            className="text-[0.85rem] truncate"
+            className="text-[0.85rem] text-text truncate"
             onDoubleClick={() => {
               setEditName(layer.name);
               setIsEditing(true);
