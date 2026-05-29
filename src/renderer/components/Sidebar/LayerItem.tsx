@@ -211,11 +211,6 @@ const LayerItem: React.FC<LayerItemProps> = ({
         dropPosition === "above" ? "border-t-2 border-t-accent" : ""
       } ${dropPosition === "below" ? "border-b-2 border-b-accent" : ""}`}
       onClick={(e) => onClick(e, layer.id)}
-      onDoubleClick={() => {
-        if (layer.type === "smart_object") {
-          openSmartObject(projectId, layer.id);
-        }
-      }}
       draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, index)}
       onDragOver={handleDragOver}
@@ -268,6 +263,11 @@ const LayerItem: React.FC<LayerItemProps> = ({
         <div
           className={`w-8 h-8 bg-[#333] relative rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
           onClick={handleThumbnailClick}
+          onDoubleClick={() => {
+            if (layer.type === "smart_object") {
+              openSmartObject(projectId, layer.id);
+            }
+          }}
         >
           <img
             src={layer.data}
