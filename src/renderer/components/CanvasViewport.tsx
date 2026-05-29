@@ -7,9 +7,23 @@ import { useUIStore } from "@store/uiStore";
 import { ForgeEngine } from "@core/engine/ForgeEngine";
 import Ruler from "./Ruler";
 
+import { forgeEvents, FORGE_EVENTS } from "@utils/events";
+
 const CanvasViewport: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ForgeEngine | null>(null);
+
+  useEffect(() => {
+    const handleFitToScreen = () => {
+      engineRef.current?.animateFitToScreen();
+    };
+
+    forgeEvents.addEventListener(FORGE_EVENTS.FIT_TO_SCREEN, handleFitToScreen);
+    return () => {
+      forgeEvents.removeEventListener(FORGE_EVENTS.FIT_TO_SCREEN, handleFitToScreen);
+    };
+  }, []);
+
   const project = useProjectStore(
     (state) => state.projects.find((p) => p.id === state.activeProjectId) || null,
   );

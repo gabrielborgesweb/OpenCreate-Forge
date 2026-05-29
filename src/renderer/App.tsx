@@ -20,6 +20,8 @@ import Toast from "./components/ui/Toast";
 import { useMenuHandler } from "./hooks/useMenuHandler";
 
 import { getClipboardImageDimensions } from "@utils/clipboardUtils";
+import { forgeEvents, FORGE_EVENTS } from "@utils/events";
+
 // ... (imports remain)
 
 function App() {
@@ -242,6 +244,10 @@ function App() {
     };
   }, []);
 
+  const fileName = activeProject?.filePath
+    ? activeProject?.filePath.split(/[\\/]/).pop()
+    : "Unknown";
+
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
@@ -289,19 +295,20 @@ function App() {
       </main>
       {/* 4. Footer / Status Bar */}
       <footer className="h-[25px] px-4 bg-[#222] border-t border-bg-tertiary text-[0.75rem] flex items-center justify-between text-[#888]">
-        <div>
-          {activeTab === "home"
-            ? "Welcome to OpenCreate Forge"
-            : `Editing ${activeProject?.name || "Unknown"}.ocfd`}
-        </div>
-        {activeProject && (
+        <div>{activeTab === "home" ? "Welcome to OpenCreate Forge" : `Editing ${fileName}`}</div>
+        {activeProject && activeTab !== "home" && (
           <div className="flex gap-4">
             <span>
               {activeProject.width} x {activeProject.height} px
             </span>
-            <span className="text-accent font-bold">
+            <button
+              className="text-accent font-bold"
+              onClick={() => {
+                forgeEvents.emit(FORGE_EVENTS.FIT_TO_SCREEN);
+              }}
+            >
               Zoom: {Math.round(activeProject.zoom * 100)}%
-            </span>
+            </button>
           </div>
         )}
       </footer>
