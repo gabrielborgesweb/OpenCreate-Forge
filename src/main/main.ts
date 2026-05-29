@@ -96,7 +96,7 @@ function createMenu(hasProject = false) {
           click: () => win?.webContents.send("menu:action", "open-export-modal"),
         },
         {
-          label: "Copy to Clipboard",
+          label: "Export to Clipboard",
           accelerator: "CmdOrCtrl+Shift+C",
           enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "export-to-clipboard"),
