@@ -321,7 +321,7 @@ const LayerList: React.FC = () => {
       let currentParentId = layer.parentId;
       let depth = 0;
 
-      while (currentParentId && layer.type !== "smart_object") {
+      while (currentParentId) {
         depth++;
         const parent = project.layers.find((l) => l.id === currentParentId);
         if (parent && !parent.isExpanded) {

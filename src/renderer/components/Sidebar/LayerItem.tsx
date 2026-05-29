@@ -56,6 +56,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
 }) => {
   const renameLayer = useProjectStore((state) => state.renameLayer);
   const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
+  const openSmartObject = useProjectStore((state) => state.openSmartObject);
   // const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
   const updateProject = useProjectStore((state) => state.updateProject);
   const showToast = useUIStore((state) => state.showToast);
@@ -210,6 +211,11 @@ const LayerItem: React.FC<LayerItemProps> = ({
         dropPosition === "above" ? "border-t-2 border-t-accent" : ""
       } ${dropPosition === "below" ? "border-b-2 border-b-accent" : ""}`}
       onClick={(e) => onClick(e, layer.id)}
+      onDoubleClick={() => {
+        if (layer.type === "smart_object") {
+          openSmartObject(projectId, layer.id);
+        }
+      }}
       draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, index)}
       onDragOver={handleDragOver}

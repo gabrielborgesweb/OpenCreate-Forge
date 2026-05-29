@@ -10,10 +10,10 @@ import Ruler from "./Ruler";
 const CanvasViewport: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ForgeEngine | null>(null);
-  const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const project = useProjectStore(
-    (state) => state.projects.find((p) => p.id === activeProjectId) || null,
+    (state) => state.projects.find((p) => p.id === state.activeProjectId) || null,
   );
+  const activeProjectId = project?.id || null;
 
   const showToast = useUIStore((state) => state.showToast);
   const showRulers = useUIStore((state) => state.showRulers);

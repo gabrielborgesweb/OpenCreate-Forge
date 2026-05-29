@@ -17,6 +17,7 @@ export const useMenuHandler = () => {
   const addLayer = useProjectStore((state) => state.addLayer);
   const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
   const removeLayer = useProjectStore((state) => state.removeLayer);
+  const syncSmartObject = useProjectStore((state) => state.syncSmartObject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const showToast = useUIStore((state) => state.showToast);
   const showRulers = useUIStore((state) => state.showRulers);
@@ -87,6 +88,25 @@ export const useMenuHandler = () => {
 
         case "save-project":
           if (!activeProject) return;
+
+          if (activeProject.parentLayerId) {
+            try {
+              await syncSmartObject(activeProject.id);
+              updateProject(activeProject.id, { isDirty: false });
+              showToast("Smart Object updated", "info");
+              window.dispatchEvent(
+                new CustomEvent("forge:save-project-finished", { detail: { success: true } }),
+              );
+            } catch (err: any) {
+              console.error("Sync error:", err);
+              showToast(`Failed to update Smart Object: ${err.message}`, "error");
+              window.dispatchEvent(
+                new CustomEvent("forge:save-project-finished", { detail: { success: false } }),
+              );
+            }
+            return;
+          }
+
           if (activeProject.filePath) {
             const isImage = /\.(png|jpg|jpeg|webp|bmp)$/i.test(activeProject.filePath);
 
@@ -337,5 +357,6 @@ export const useMenuHandler = () => {
     showRulers,
     setShowRulers,
     addRecentProject,
+    syncSmartObject,
   ]);
 };

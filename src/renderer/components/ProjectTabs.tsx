@@ -4,7 +4,7 @@
 import React from "react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
-import { Home, X } from "lucide-react";
+import { Home, X, Box } from "lucide-react";
 
 const ProjectTabs: React.FC = () => {
   const { projects, removeProject, setActiveProject } = useProjectStore();
@@ -112,14 +112,19 @@ const ProjectTabs: React.FC = () => {
             activeTab === project.id
               ? "bg-bg-primary text-text border-accent active:!translate-y-0 active:!filter-none"
               : "bg-transparent text-[#666] hover:bg-white/5 border-transparent"
-          }`}
+          } ${project.parentLayerId ? "italic" : ""}`}
           onClick={() => handleTabClick(project.id)}
         >
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {project.filePath
-              ? project.filePath.split(/[\\/]/).pop()
-              : `${project.name}.ocfd`}
-          </span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            {project.parentLayerId && <Box size={12} className="text-accent shrink-0" />}
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+              {project.parentLayerId
+                ? `${project.name}`
+                : project.filePath
+                  ? project.filePath.split(/[\\/]/).pop()
+                  : `${project.name}.ocfd`}
+            </span>
+          </div>
           <div
             tabIndex={-1}
             className="group relative bg-none border-none text-inherit flex p-[4px] rounded-[2px] cursor-pointer hover:bg-white/10 transition-colors w-[20px] h-[20px] items-center justify-center"

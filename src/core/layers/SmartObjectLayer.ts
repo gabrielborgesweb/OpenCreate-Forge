@@ -26,35 +26,36 @@ export class SmartObjectLayer {
     imageCache: Map<string, HTMLImageElement>,
     onReady: () => void,
   ) {
-    // For Phase 1, we render the 'data' property which contains the flattened project.
-    // This is identical to RasterLayer rendering but explicitly for smart_object types.
+    // Prefer dataOriginal for rendering to maintain quality during transformations.
+    const sourceData = layer.dataOriginal || layer.data;
     let lCanvas = layerCanvasCache.get(layer.id);
 
     if (
       !lCanvas ||
       lCanvas.width !== layer.width ||
       lCanvas.height !== layer.height ||
-      (lCanvas as any)._dataUrl !== layer.data
+      (lCanvas as any)._dataUrl !== sourceData
     ) {
-      if (layer.data) {
+      if (sourceData) {
         const populateCache = (image: HTMLImageElement) => {
           if (image.naturalWidth === 0) return null;
           const cachedCanvas = document.createElement("canvas");
           cachedCanvas.width = layer.width;
           cachedCanvas.height = layer.height;
-          (cachedCanvas as any)._dataUrl = layer.data;
+          (cachedCanvas as any)._dataUrl = sourceData;
           const cctx = cachedCanvas.getContext("2d")!;
+          // Canvas handles the non-destructive scaling here
           cctx.drawImage(image, 0, 0, layer.width, layer.height);
           layerCanvasCache.set(layer.id, cachedCanvas);
           layerReadyCache.set(layer.id, true);
           return cachedCanvas;
         };
 
-        let img = imageCache.get(layer.data);
+        let img = imageCache.get(sourceData);
         if (!img) {
           img = new Image();
-          img.src = layer.data;
-          imageCache.set(layer.data, img);
+          img.src = sourceData;
+          imageCache.set(sourceData, img);
           img.addEventListener(
             "load",
             () => {

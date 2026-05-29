@@ -281,7 +281,7 @@ function App() {
               <Toolbar />
             </aside>
 
-            <CanvasViewport />
+            <CanvasViewport key={activeProjectId || "empty"} />
 
             <RightSidebar />
           </>

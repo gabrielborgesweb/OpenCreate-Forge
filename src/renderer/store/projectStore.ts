@@ -3,6 +3,7 @@
  */
 import { create } from "zustand";
 import { usePreferencesStore } from "./preferencesStore";
+import { useUIStore } from "./uiStore";
 
 /**
  * Represents a formatted segment of text with specific styling.
@@ -46,6 +47,8 @@ export interface Layer {
   height: number;
   /** Base64 encoded image data for raster layers or flattened smart objects. */
   data?: string;
+  /** Original image data used for non-destructive transforms. */
+  dataOriginal?: string;
   /** Nested project data for smart objects. */
   dataObject?: Project;
   /** Original transformation for smart objects (used for reset). */
@@ -161,6 +164,10 @@ export interface Project {
   isDirty: boolean;
   /** File system path if the project has been saved. */
   filePath?: string;
+  /** ID of the parent layer if this is a smart object project. */
+  parentLayerId?: string;
+  /** ID of the parent project if this is a smart object project. */
+  parentProjectId?: string;
   /** Version of the document format. */
   version?: string;
   /** Creation timestamp. */
@@ -236,6 +243,10 @@ interface ProjectState {
   rasterizeSmartObject: (projectId: string, layerId: string) => void;
   /** Resets the transformation of a Smart Object to its original state. */
   resetSmartObjectTransform: (projectId: string, layerId: string) => void;
+  /** Opens a Smart Object for editing in a new tab. */
+  openSmartObject: (projectId: string, layerId: string) => void;
+  /** Synchronizes changes from a Smart Object tab back to its parent layer. */
+  syncSmartObject: (smartProjectId: string) => Promise<void>;
   /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
   /** Sets the selected layers for a project. */
@@ -1026,6 +1037,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       parentId: l.parentId && movingLayerIds.has(l.parentId) ? l.parentId : null,
     }));
 
+    // Find the correct parentId for the Smart Object itself.
+    // It should inherit the parent of the topmost moving layer,
+    // BUT only if that parent is NOT also moving.
+    const topMovingLayer = selectedLayers[selectedLayers.length - 1];
+    let finalParentId: string | null = null;
+    let currentCheckId = topMovingLayer.parentId;
+
+    while (currentCheckId && movingLayerIds.has(currentCheckId)) {
+      const parent = project.layers.find((l) => l.id === currentCheckId);
+      currentCheckId = parent?.parentId || null;
+    }
+    finalParentId = currentCheckId || null;
+
     const dataObject: Project = {
       id: smartObjectId,
       name: selectedLayers.length === 1 ? selectedLayers[0].name : "Smart Object Content",
@@ -1045,7 +1069,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const smartLayer: Layer = {
       id: smartObjectId,
-      name: selectedLayers.length === 1 ? `${selectedLayers[0].name}` : "Smart Object",
+      name: selectedLayers[selectedLayers.length - 1].name, // Use the topmost layer's name for the smart object
       type: "smart_object",
       visible: true,
       locked: false,
@@ -1055,6 +1079,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       width,
       height,
       data: dataURL,
+      dataOriginal: dataURL,
       dataObject,
       blendMode: "source-over",
       originalTransform: {
@@ -1065,7 +1090,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         rotation: 0,
         data: dataURL,
       },
-      parentId: selectedLayers[0].parentId || null,
+      parentId: finalParentId,
     };
 
     // Push to history
@@ -1127,14 +1152,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             ? {
                 ...p,
                 layers: p.layers.map((l) =>
-                  l.id === layerId
-                    ? { ...l, type: "raster", dataObject: undefined, parentId: null }
-                    : l,
+                  l.id === layerId ? { ...l, type: "raster", dataObject: undefined } : l,
                 ),
                 isDirty: true,
                 undoStack: newUndoStack,
                 redoStack: [],
-                parentId: null,
               }
             : p,
         ),
@@ -1171,6 +1193,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                         height: l.originalTransform!.height,
                         rotation: l.originalTransform!.rotation,
                         data: l.originalTransform!.data || l.data,
+                        dataOriginal: l.originalTransform!.data || l.dataOriginal,
                       }
                     : l,
                 ),
@@ -1182,6 +1205,147 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ),
       };
     }),
+
+  openSmartObject: (projectId, layerId) => {
+    const state = get();
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const layer = project.layers.find((l) => l.id === layerId);
+    if (!layer || layer.type !== "smart_object" || !layer.dataObject) return;
+
+    // Check if it's already open
+    const alreadyOpen = state.projects.find((p) => p.id === layer.id);
+    if (alreadyOpen) {
+      useUIStore.getState().setActiveTab(alreadyOpen.id);
+      get().setActiveProject(alreadyOpen.id);
+      return;
+    }
+
+    // Create a new project instance from dataObject
+    const newProject: Project = {
+      ...JSON.parse(JSON.stringify(layer.dataObject)),
+      id: layer.id, // Use layer ID as project ID to link them
+      parentLayerId: layer.id,
+      parentProjectId: projectId,
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    };
+
+    set((state) => ({
+      projects: [...state.projects, newProject],
+    }));
+
+    useUIStore.getState().setActiveTab(newProject.id);
+    get().setActiveProject(newProject.id);
+  },
+
+  syncSmartObject: async (smartProjectId) => {
+    const state = get();
+    const smartProject = state.projects.find((p) => p.id === smartProjectId);
+    if (!smartProject || !smartProject.parentProjectId || !smartProject.parentLayerId) return;
+
+    const parentProject = state.projects.find((p) => p.id === smartProject.parentProjectId);
+    if (!parentProject) return;
+
+    const parentLayer = parentProject.layers.find((l) => l.id === smartProject.parentLayerId);
+    if (!parentLayer || !parentLayer.dataObject) return;
+
+    // 1. Render the smart project to a DataURL
+    const width = smartProject.width;
+    const height = smartProject.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+
+    // Basic rendering (reuse logic from convertToSmartObject)
+    for (const layer of smartProject.layers) {
+      if (!layer.visible) continue;
+      ctx.save();
+      ctx.globalAlpha = layer.opacity / 100;
+      ctx.globalCompositeOperation = layer.blendMode;
+
+      if (layer.type === "raster" && layer.data) {
+        const img = new Image();
+        img.src = layer.data;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+      } else if (layer.type === "text" && layer.text) {
+        ctx.fillStyle = layer.color || "white";
+        ctx.font = `${layer.fontWeight || "normal"} ${layer.fontSize || 20}px ${layer.fontFamily || "sans-serif"}`;
+        ctx.textBaseline = "top";
+        ctx.fillText(layer.text, layer.x, layer.y);
+      } else if (layer.type === "smart_object" && layer.data) {
+        const img = new Image();
+        img.src = layer.data;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+      }
+      ctx.restore();
+    }
+
+    const dataURL = canvas.toDataURL();
+
+    // Calculate new dimensions to prevent distortion
+    const oldInternalWidth = parentLayer.dataObject.width;
+    const oldInternalHeight = parentLayer.dataObject.height;
+
+    // Preserve current scale factor
+    const scaleX = parentLayer.width / oldInternalWidth;
+    const scaleY = parentLayer.height / oldInternalHeight;
+
+    const newParentWidth = smartProject.width * scaleX;
+    const newParentHeight = smartProject.height * scaleY;
+
+    // 2. Update parent layer
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== smartProject.parentProjectId) return p;
+
+        const historyState = createHistoryState(p);
+        const newUndoStack = [
+          ...p.undoStack,
+          { description: "Update Smart Object", state: historyState },
+        ];
+        if (newUndoStack.length > getMaxHistory()) newUndoStack.shift();
+
+        return {
+          ...p,
+          layers: p.layers.map((l) =>
+            l.id === smartProject.parentLayerId
+              ? {
+                  ...l,
+                  width: newParentWidth,
+                  height: newParentHeight,
+                  data: dataURL,
+                  dataOriginal: dataURL,
+                  dataObject: JSON.parse(JSON.stringify(getSerializableProject(smartProject))),
+                  originalTransform: l.originalTransform
+                    ? {
+                        ...l.originalTransform,
+                        width: smartProject.width,
+                        height: smartProject.height,
+                        data: dataURL,
+                      }
+                    : undefined,
+                }
+              : l,
+          ),
+          isDirty: true,
+          undoStack: newUndoStack,
+          redoStack: [],
+        };
+      }),
+    }));
+  },
 
   undoText: (projectId, layerId) =>
     set((state) => ({

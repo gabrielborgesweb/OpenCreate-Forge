@@ -580,6 +580,31 @@ export class TransformTool extends BaseTool {
     const newX = Math.round(minX);
     const newY = Math.round(minY);
 
+    if (layer.type === "smart_object") {
+      // Non-destructive update for smart objects
+      const finalWidth = t.width * t.scaleX;
+      const finalHeight = t.height * t.scaleY;
+
+      context.updateProject({
+        layers: context.project.layers.map((l) =>
+          l.id === layer.id
+            ? {
+                ...l,
+                x: t.x - finalWidth * t.anchor.x,
+                y: t.y - finalHeight * t.anchor.y,
+                width: finalWidth,
+                height: finalHeight,
+                rotation: t.rotation,
+              }
+            : l,
+        ),
+        isDirty: true,
+      });
+      context.invalidateCache(layer.id);
+      context.setActiveTool(context.previousToolId);
+      return;
+    }
+
     const layerCanvas = context.getLayerCanvas(layer.id);
     if (layerCanvas?.ready) {
       const offCanvas = document.createElement("canvas");
