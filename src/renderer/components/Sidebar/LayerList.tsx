@@ -258,10 +258,15 @@ const LayerList: React.FC = () => {
   };
 
   const handleAddNewLayer = () => {
-    addLayer(project.id, {
-      type: "raster",
-      name: `Layer ${project.layers.length + 1}`,
-    });
+    addLayer(
+      project.id,
+      {
+        type: "raster",
+        name: `Layer ${project.layers.length + 1}`,
+      },
+      false,
+      project.activeLayerId ?? undefined,
+    );
   };
 
   const handleDeleteActiveLayer = () => {

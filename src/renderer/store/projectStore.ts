@@ -202,7 +202,12 @@ interface ProjectState {
   /** Updates project-level properties. */
   updateProject: (id: string, updates: Partial<Project>) => void;
   /** Adds a new layer to a specific project. */
-  addLayer: (projectId: string, layer: Partial<Layer>, skipHistory?: boolean) => void;
+  addLayer: (
+    projectId: string,
+    layer: Partial<Layer>,
+    skipHistory?: boolean,
+    insertAboveLayerId?: string,
+  ) => void;
   /** Removes a layer from a specific project. */
   removeLayer: (projectId: string, layerId: string, skipHistory?: boolean) => void;
   /** Removes multiple layers from a specific project. */
@@ -448,7 +453,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       ),
     })),
 
-  addLayer: (projectId, partialLayer, skipHistory = false) =>
+  addLayer: (projectId, partialLayer, skipHistory = false, insertAboveLayerId?: string) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
@@ -490,7 +495,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           p.id === projectId
             ? {
                 ...p,
-                layers: [...p.layers, newLayer],
+                layers: (() => {
+                  const targetId = insertAboveLayerId ?? p.activeLayerId;
+                  const targetIndex = targetId ? p.layers.findIndex((l) => l.id === targetId) : -1;
+                  const layers = [...p.layers];
+                  if (targetIndex !== -1) {
+                    layers.splice(targetIndex + 1, 0, newLayer);
+                  } else {
+                    layers.push(newLayer);
+                  }
+                  return layers;
+                })(),
                 activeLayerId: id,
                 selectedLayerIds: [id],
                 isDirty: true,

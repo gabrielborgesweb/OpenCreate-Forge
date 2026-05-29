@@ -29,6 +29,41 @@ describe("projectStore", () => {
     expect(useProjectStore.getState().projects).toHaveLength(1);
   });
 
+  it("should insert a new layer above the active layer", () => {
+    const store = useProjectStore.getState();
+    const projectId = "p1";
+    store.addProject({
+      id: projectId,
+      name: "Test Project",
+      width: 800,
+      height: 600,
+      layers: [
+        { id: "l1", name: "Layer 1", visible: true, type: "raster", locked: false, opacity: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
+        { id: "l2", name: "Layer 2", visible: true, type: "raster", locked: false, opacity: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
+      ],
+      activeLayerId: "l1",
+      selectedLayerIds: ["l1"],
+      selection: { hasSelection: false, bounds: null },
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    });
+
+    // Add layer above l1
+    store.addLayer(projectId, { type: "raster", name: "New Layer" }, false, "l1");
+
+    const project = useProjectStore.getState().projects[0];
+    
+    // Layers should be [l1, New Layer, l2]
+    expect(project.layers).toHaveLength(3);
+    expect(project.layers[0].id).toBe("l1");
+    expect(project.layers[1].name).toBe("New Layer");
+    expect(project.layers[2].id).toBe("l2");
+  });
+
   it("should isolate a layer and restore all", () => {
     const store = useProjectStore.getState();
     const projectId = "p1";
