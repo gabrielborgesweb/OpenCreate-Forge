@@ -1052,7 +1052,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const dataObject: Project = {
       id: smartObjectId,
-      name: selectedLayers.length === 1 ? selectedLayers[0].name : "Smart Object Content",
+      name: selectedLayers[selectedLayers.length - 1].name, // Use the topmost layer's name for the smart object
       width,
       height,
       layers: nestedLayers,
