@@ -9,9 +9,9 @@ import {
   Trash2,
   Copy,
   Folder,
+  FolderOpen,
   Box,
   Image as ImageIcon,
-  Ungroup,
   Lock,
   Unlock,
   RotateCcw,
@@ -444,21 +444,21 @@ const LayerList: React.FC = () => {
               onClick: () => removeLayers(project.id, project.selectedLayerIds),
             },
             { isSeparator: true },
+            {
+              label: "Group Layer(s)",
+              icon: Folder,
+              onClick: () => groupLayers(project.id, project.selectedLayerIds),
+            },
             ...(contextMenu.layer.type === "group"
               ? [
                   {
                     label: "Ungroup Layer(s)",
-                    icon: Ungroup,
+                    icon: FolderOpen,
+                    danger: true,
                     onClick: () => ungroupLayers(project.id, contextMenu.layer.id),
                   },
                 ]
-              : [
-                  {
-                    label: "Group Layer(s)",
-                    icon: Folder,
-                    onClick: () => groupLayers(project.id, project.selectedLayerIds),
-                  },
-                ]),
+              : []),
             { isSeparator: true },
 
             ...(contextMenu.layer.type === "smart_object"

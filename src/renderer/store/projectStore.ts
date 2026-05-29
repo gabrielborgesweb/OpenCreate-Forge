@@ -965,7 +965,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       newLayers.splice(
         adjustedTargetIndex,
         0,
-        ...selectedLayers.map((l) => ({ ...l, parentId: groupId })),
+        ...selectedLayers.map((l) => {
+          // If the layer's parent is also being moved (part of the selection),
+          // keep its original parentId to preserve the internal hierarchy.
+          const isParentInSelection = l.parentId && movingLayerIds.has(l.parentId);
+          return {
+            ...l,
+            parentId: isParentInSelection ? l.parentId : groupId,
+          };
+        }),
         newGroup,
       );
 
