@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 
 export type ContextMenuItem =
   | {
@@ -21,6 +21,8 @@ interface ContextMenuProps {
 const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isExiting, setIsExiting] = useState(false);
+  const [coords, setCoords] = useState({ posX: x, posY: y });
+  const [origin, setOrigin] = useState("top left");
 
   const handleClose = useCallback(() => {
     setIsExiting(true);
@@ -50,19 +52,31 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
     };
   }, [handleClose]);
 
-  // Adjust position if menu goes off screen
-  // const menuWidth = 200;
-  // const menuHeight = items.length * 36 + 16; // Approximate height
+  useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      let newX = x;
+      let newY = y;
+      let originX = "left";
+      let originY = "top";
 
-  const posX = x;
-  const posY = y;
+      if (x + rect.width > window.innerWidth) {
+        newX = x - rect.width;
+        originX = "right";
+      }
+      if (y + rect.height > window.innerHeight) {
+        newY = y - rect.height;
+        originY = "bottom";
+      }
 
-  // if (x + menuWidth > window.innerWidth) {
-  //   posX = x - menuWidth;
-  // }
-  // if (y + menuHeight > window.innerHeight) {
-  //   posY = y - menuHeight;
-  // }
+      // Final boundary checks
+      newX = Math.max(8, Math.min(newX, window.innerWidth - rect.width - 8));
+      newY = Math.max(8, Math.min(newY, window.innerHeight - rect.height - 8));
+
+      setCoords({ posX: newX, posY: newY });
+      setOrigin(`${originY} ${originX}`);
+    }
+  }, [x, y, items]);
 
   return (
     <>
@@ -89,12 +103,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
       }
 
       .animate-context-menu-in {
-        transform-origin: top left;
         animation: context-menu-in 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
 
       .animate-context-menu-out {
-        transform-origin: top left;
         animation: context-menu-out 100ms ease-in forwards;
       }
       `}
@@ -104,7 +116,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
         className={`fixed z-[1000] bg-bg-primary/80 backdrop-blur-lg border border-bg-tertiary rounded-lg shadow-xl py-2 min-w-[200px] ${
           isExiting ? "animate-context-menu-out" : "animate-context-menu-in"
         }`}
-        style={{ top: posY, left: posX }}
+        style={{
+          top: coords.posY,
+          left: coords.posX,
+          transformOrigin: origin,
+        }}
       >
         {items.map((item, index) => {
           if ("isSeparator" in item) {
@@ -124,7 +140,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
               }`}
             >
               {item.icon && <item.icon size={16} />}
-              <span className="text-[0.85rem]">{item.label}</span>
+              <span className="text-[0.85rem] text-nowrap">{item.label}</span>
             </div>
           );
         })}
