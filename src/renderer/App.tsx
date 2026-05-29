@@ -21,6 +21,7 @@ import { useMenuHandler } from "./hooks/useMenuHandler";
 
 import { getClipboardImageDimensions } from "@utils/clipboardUtils";
 import { forgeEvents, FORGE_EVENTS } from "@utils/events";
+import { Box } from "lucide-react";
 
 // ... (imports remain)
 
@@ -246,7 +247,7 @@ function App() {
 
   const fileName = activeProject?.filePath
     ? activeProject?.filePath.split(/[\\/]/).pop()
-    : "Unknown";
+    : activeProject?.name || "Unknown";
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
@@ -295,7 +296,20 @@ function App() {
       </main>
       {/* 4. Footer / Status Bar */}
       <footer className="h-[25px] px-4 bg-[#222] border-t border-bg-tertiary text-[0.75rem] flex items-center justify-between text-[#888]">
-        <div>{activeTab === "home" ? "Welcome to OpenCreate Forge" : `Editing ${fileName}`}</div>
+        <div
+          className={`flex items-center gap-1 ${activeProject?.parentProjectId ? "italic" : ""} ${activeProject?.isDirty ? "font-bold" : ""}`}
+        >
+          {activeTab === "home" ? (
+            "Welcome to OpenCreate Forge"
+          ) : (
+            <>
+              {activeProject?.parentProjectId ? (
+                <Box size={12} className="text-accent inline-block mb-[2px] mr-1" />
+              ) : null}
+              {`Editing ${fileName}`}
+            </>
+          )}
+        </div>
         {activeProject && activeTab !== "home" && (
           <div className="flex gap-4">
             <span>
