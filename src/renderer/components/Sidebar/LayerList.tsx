@@ -416,6 +416,7 @@ const LayerList: React.FC = () => {
 
       {contextMenu && (
         <ContextMenu
+          key={`${contextMenu.x}-${contextMenu.y}`}
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

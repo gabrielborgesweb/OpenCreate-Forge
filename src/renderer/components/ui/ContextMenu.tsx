@@ -20,16 +20,25 @@ interface ContextMenuProps {
 
 const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isExiting, setIsExiting] = useState(false);
   const [coords, setCoords] = useState({ posX: x, posY: y });
   const [origin, setOrigin] = useState("top left");
 
   const handleClose = useCallback(() => {
     setIsExiting(true);
-    setTimeout(() => {
+    closeTimeoutRef.current = setTimeout(() => {
       onClose();
     }, 100); // Matches animation-context-menu-out duration
   }, [onClose]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -135,7 +144,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
                 item.onClick();
                 handleClose();
               }}
-              className={`flex items-center gap-3 px-3 py-1 cursor-pointer transition-colors ${
+              className={`flex items-center gap-3 px-3 py-1 cursor-pointer active:opacity-80 ${
                 item.danger ? "text-red-400 hover:bg-red-400/10" : "text-text hover:bg-white/10"
               }`}
             >
