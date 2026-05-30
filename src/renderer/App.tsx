@@ -21,7 +21,7 @@ import { useMenuHandler } from "./hooks/useMenuHandler";
 
 import { getClipboardImageDimensions } from "@utils/clipboardUtils";
 import { forgeEvents, FORGE_EVENTS } from "@utils/events";
-import { Box } from "lucide-react";
+import { Box, X } from "lucide-react";
 
 // ... (imports remain)
 
@@ -49,6 +49,29 @@ function App() {
   >(undefined);
   const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = React.useState(false);
+
+  // Placeholder for update availability
+  const [isUpdateAvailable, setIsUpdateAvailable] = React.useState(null as any);
+  // const [isUpdateAvailable, setIsUpdateAvailable] = React.useState({
+  //   version: "v0.1.1",
+  //   channel: "stable",
+  //   changelog_md: "https://example.com/changelog.md",
+  //   isClosed: false,
+  // });
+
+  // (Placeholder) Simulate update check on mount
+  React.useEffect(() => {
+    // Simulate an update being available after 5 seconds
+    // const updateTimeout = setTimeout(() => {
+    //   setIsUpdateAvailable({
+    //     version: "0.1.1",
+    //     channel: "stable",
+    //     changelog_md: "https://example.com/changelog.md",
+    //     isClosed: false,
+    //   });
+    // }, 3500);
+    // return () => clearTimeout(updateTimeout);
+  }, []);
 
   React.useEffect(() => {
     if (!(window as any).electronAPI) return;
@@ -270,6 +293,83 @@ function App() {
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
       />
+      {/* Update Notification */}
+      {isUpdateAvailable && !isUpdateAvailable.isClosed && (
+        <div
+          className="h-10 bg-accent overflow-hidden animate-banner-slide-down"
+          id="banner-update-notification"
+        >
+          <style>
+            {`@keyframes banner-fade-in {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            .animate-banner-fade-in {
+              animation: banner-fade-in 500ms 200ms ease forwards;
+            }
+
+            @keyframes banner-slide-down {
+              from { margin-top: -40px; }
+              to { margin-top: 0; }
+            }
+            @keyframes banner-slide-up {
+              from { margin-top: 0; }
+              to { margin-top: -40px; }
+            }
+            .animate-banner-slide-down {
+              animation: banner-slide-down 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            }
+            .animate-banner-slide-up {
+              animation: banner-slide-up 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            }
+          `}
+          </style>
+          <div className="w-full h-full flex gap-3 items-center justify-center px-4 text-[0.85rem] text-text relative opacity-0 animate-banner-fade-in">
+            <span className="mr-2">
+              New patch <b>{isUpdateAvailable.version.trim()}</b> is available!
+            </span>
+
+            <button
+              className="underline !cursor-pointer"
+              onClick={() => {
+                // TODO: Open changelog in a modal `ChangelogModal` rendering the markdown content
+                showToast("(Placeholder) Opening changelog...", "info");
+              }}
+            >
+              View Changelog
+            </button>
+            <button
+              className="bg-white/90 text-accent px-3 py-1 rounded !cursor-pointer"
+              onClick={() => {
+                // TODO: Trigger actual update process
+                showToast("(Placeholder) Downloading update...", "info");
+              }}
+            >
+              Update Now
+            </button>
+
+            <button
+              className="flex justify-center items-center text-sm text-text absolute right-3 top-0 bottom-0 my-auto w-6 h-6 rounded-full !cursor-pointer bg-transparent hover:bg-white/20 transition-all "
+              onClick={() => {
+                // Animate slide up before closing
+                const updateNotification = document.getElementById("banner-update-notification");
+                if (updateNotification) {
+                  updateNotification.classList.remove("animate-banner-slide-down");
+                  updateNotification.classList.add("animate-banner-slide-up");
+                  const timeout = setTimeout(() => {
+                    setIsUpdateAvailable({ ...isUpdateAvailable, isClosed: true });
+                    clearTimeout(timeout);
+                  }, 500); // Match the animation duration
+                } else {
+                  setIsUpdateAvailable({ ...isUpdateAvailable, isClosed: true });
+                }
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
       {/* 1. Project Tabs */}
       <ProjectTabs />
       {/* 2. Dynamic Header (Tool Options) */}
