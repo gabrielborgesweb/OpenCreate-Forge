@@ -221,6 +221,10 @@ const LayerItem: React.FC<LayerItemProps> = ({
     >
       {/* Visibility Toggle */}
       <button
+        onClick={(e) => {
+          // Prevent click from selecting the layer when toggling visibility
+          e.stopPropagation();
+        }}
         onMouseDown={(e) => onVisibilityMouseDown(e, layer.id)}
         onMouseEnter={(e) => onVisibilityMouseEnter(e, layer.id)}
         tabIndex={-1}

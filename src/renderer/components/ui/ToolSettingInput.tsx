@@ -117,6 +117,8 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
             onChange(val / displayMultiplier);
           }}
           onKeyDown={(e) => {
+            // Prevent arrow keys from move the layer
+            e.stopPropagation();
             if (e.key === "Enter") setIsOpen(false);
           }}
           onClick={(e) => e.stopPropagation()}
