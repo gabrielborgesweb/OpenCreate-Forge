@@ -29,8 +29,8 @@ describe("MoveTool", () => {
     const tool = new MoveTool();
     const project = createMockProject();
     project.layers = [
-      { id: "1", name: "L1", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100 },
-      { id: "2", name: "L2", x: 10, y: 10, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100 },
+      { id: "1", name: "L1", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100, fill: 100 },
+      { id: "2", name: "L2", x: 10, y: 10, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100, fill: 100 },
     ];
     project.selectedLayerIds = ["1", "2"];
     context.project = project;
@@ -54,8 +54,8 @@ describe("MoveTool", () => {
     const tool = new MoveTool();
     const project = createMockProject();
     project.layers = [
-      { id: "g1", name: "Group", x: 0, y: 0, width: 0, height: 0, type: "group", visible: true, locked: false, blendMode: "source-over", opacity: 100 },
-      { id: "l1", name: "Child", x: 50, y: 50, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100, parentId: "g1" },
+      { id: "g1", name: "Group", x: 0, y: 0, width: 0, height: 0, type: "group", visible: true, locked: false, blendMode: "source-over", opacity: 100, fill: 100 },
+      { id: "l1", name: "Child", x: 50, y: 50, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100, fill: 100, parentId: "g1" },
     ];
     project.selectedLayerIds = ["g1"];
     context.project = project;
@@ -79,8 +79,8 @@ describe("MoveTool", () => {
     const tool = new MoveTool();
     const project = createMockProject();
     project.layers = [
-      { id: "l1", name: "Locked", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: true, blendMode: "source-over", opacity: 100 },
-      { id: "l2", name: "Normal", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100 },
+      { id: "l1", name: "Locked", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: true, blendMode: "source-over", opacity: 100, fill: 100 },
+      { id: "l2", name: "Normal", x: 0, y: 0, width: 100, height: 100, type: "raster", visible: true, locked: false, blendMode: "source-over", opacity: 100, fill: 100 },
     ];
     project.selectedLayerIds = ["l1", "l2"];
     context.project = project;
