@@ -15,8 +15,55 @@ import {
   Lock,
   Unlock,
   RotateCcw,
+  // Blend,
+  // CircleDashed,
 } from "lucide-react";
 import ContextMenu from "../ui/ContextMenu";
+import ToolSettingInput from "../ui/ToolSettingInput";
+
+const BLEND_MODES: { label: string; value: GlobalCompositeOperation }[] = [
+  { label: "Normal", value: "source-over" },
+  { label: "Multiply", value: "multiply" },
+  { label: "Screen", value: "screen" },
+  { label: "Overlay", value: "overlay" },
+  { label: "Darken", value: "darken" },
+  { label: "Lighten", value: "lighten" },
+  { label: "Color Dodge", value: "color-dodge" },
+  { label: "Color Burn", value: "color-burn" },
+  { label: "Hard Light", value: "hard-light" },
+  { label: "Soft Light", value: "soft-light" },
+  { label: "Difference", value: "difference" },
+  { label: "Exclusion", value: "exclusion" },
+  { label: "Hue", value: "hue" },
+  { label: "Saturation", value: "saturation" },
+  { label: "Color", value: "color" },
+  { label: "Luminosity", value: "luminosity" },
+];
+
+export const CircleHalfDashed = ({
+  size = 24,
+  stroke = "currentColor", // Permite que o ícone herde a cor do texto do elemento pai
+  strokeWidth = 2,
+  ...props
+}: React.SVGProps<SVGSVGElement> & { size?: number | string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke={stroke}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path
+      fillRule="evenodd"
+      d="m12 22q0 0 0 0 0 0 0 0 0.5 0 1 0 0.4-0.1 0.9-0.2c0 0-2.1 0.2-1.9 0.2-5.5 0-10-4.5-10-10 0-5.5 4.5-10 10-10-0.2 0 1.9 0.2 1.9 0.2q-0.5-0.1-0.9-0.2-0.5 0-1 0 0 0 0 0 0 0 0 0m5.6 1.7q0.4 0.3 0.8 0.6 0.3 0.3 0.7 0.6 0.3 0.4 0.6 0.8 0.3 0.3 0.6 0.7zm2.7 13.9q-0.3 0.4-0.6 0.8-0.3 0.3-0.7 0.7-0.3 0.3-0.7 0.6zm1.5-7.5q0.1 0.5 0.1 0.9 0.1 0.5 0.1 1 0 0.5-0.1 0.9 0 0.5-0.1 1z"
+    />
+  </svg>
+);
 
 const LayerList: React.FC = () => {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -343,6 +390,19 @@ const LayerList: React.FC = () => {
     return displayLayers;
   };
 
+  const activeLayer = project.layers.find((l) => l.id === project.activeLayerId);
+
+  const handleUpdateProperty = (updates: Partial<Layer>, description: string) => {
+    if (!activeProjectId || project.selectedLayerIds.length === 0) return;
+
+    // We use pushHistory once for the whole batch
+    pushHistory(activeProjectId, description);
+
+    project.selectedLayerIds.forEach((id) => {
+      updateLayer(activeProjectId, id, updates);
+    });
+  };
+
   return (
     <div
       className="flex flex-col flex-1 overflow-hidden"
@@ -350,6 +410,63 @@ const LayerList: React.FC = () => {
       onDrop={handleLayerDropOnContainer}
       onDragEnd={() => setDraggedIndex(null)}
     >
+      {/* Layer Properties */}
+      <div className="p-2 px-3 border-b border-bg-tertiary">
+        <div
+          className={`flex items-center flex-wrap gap-3 gap-y-2 ${!activeLayer && "pointer-events-none opacity-50"}`}
+        >
+          <div className="flex items-center gap-2" title="Blend Mode">
+            {/* <Blend size={16} className="text-[#888]" /> */}
+            <select
+              className="bg-[#1a1a1a] border border-[#333] text-[0.75rem] px-2 py-1 rounded outline-none text-white hover:border-accent/50 transition-colors cursor-pointer"
+              value={activeLayer?.blendMode || "source-over"}
+              onChange={(e) =>
+                handleUpdateProperty(
+                  { blendMode: e.target.value as GlobalCompositeOperation },
+                  "Blend Mode Change",
+                )
+              }
+            >
+              {BLEND_MODES.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-1" title="Opacity">
+            <ToolSettingInput
+              label="Opacity"
+              // label={<CircleDashed size={16} />}
+              value={(activeLayer?.opacity ?? 100) / 100}
+              onChange={(val) =>
+                handleUpdateProperty({ opacity: Math.round(val * 100) }, "Opacity Change")
+              }
+              min={0}
+              max={1}
+              step={0.01}
+              unit="%"
+              displayMultiplier={100}
+            />
+          </div>
+          <div className="flex items-center gap-1" title="Fill">
+            <ToolSettingInput
+              label="Fill"
+              // label={<CircleHalfDashed size={16} />}
+              value={(activeLayer?.fill ?? 100) / 100}
+              onChange={(val) =>
+                handleUpdateProperty({ fill: Math.round(val * 100) }, "Fill Change")
+              }
+              min={0}
+              max={1}
+              step={0.01}
+              unit="%"
+              displayMultiplier={100}
+            />
+          </div>
+        </div>
+      </div>
+
       <div
         className="flex-1 overflow-y-auto custom-scrollbar"
         onDragOver={(e) => handleDragOver(e)}

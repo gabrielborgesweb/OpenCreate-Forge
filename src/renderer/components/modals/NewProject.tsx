@@ -91,6 +91,7 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose, initialDimensi
             visible: true,
             locked: false,
             opacity: 100,
+            fill: 100,
             x: 0,
             y: 0,
             width,

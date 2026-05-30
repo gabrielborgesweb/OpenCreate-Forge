@@ -1628,7 +1628,7 @@ export class ForgeEngine {
    */
   private renderLayer(ctx: CanvasRenderingContext2D, layer: Layer) {
     ctx.save();
-    ctx.globalAlpha = layer.opacity / 100;
+    ctx.globalAlpha = (layer.opacity / 100) * ((layer.fill ?? 100) / 100);
     ctx.globalCompositeOperation = layer.blendMode;
 
     const tool = this.getActiveTool();
@@ -1802,6 +1802,7 @@ export class ForgeEngine {
       visible: true,
       locked: false,
       opacity: 100,
+      fill: 100,
       x: bounds.x,
       y: bounds.y,
       width: bounds.width,

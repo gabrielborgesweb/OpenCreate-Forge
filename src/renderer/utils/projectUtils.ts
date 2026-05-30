@@ -26,6 +26,7 @@ export const createProjectFromImage = (
         visible: true,
         locked: false,
         opacity: 100,
+        fill: 100,
         x: 0,
         y: 0,
         width,

@@ -37,6 +37,8 @@ export interface Layer {
   locked: boolean;
   /** Layer opacity from 0 to 100. */
   opacity: number;
+  /** Layer fill from 0 to 100. */
+  fill: number;
   /** X coordinate in project space. */
   x: number;
   /** Y coordinate in project space. */
@@ -286,8 +288,16 @@ export const normalizeHistoryState = (state: any): HistoryState => ({
 });
 
 export const normalizeProject = (project: any): Project => {
+  const normalizedLayers = (project.layers || []).map((l: any) => ({
+    ...l,
+    opacity: l.opacity ?? 100,
+    fill: l.fill ?? 100,
+    blendMode: l.blendMode || "source-over",
+  }));
+
   const normalized = {
     ...project,
+    layers: normalizedLayers,
     activeLayerId: project.activeLayerId || project.layers?.[0]?.id || null,
     selectedLayerIds:
       project.selectedLayerIds ||
@@ -482,6 +492,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         visible: partialLayer.visible ?? true,
         locked: partialLayer.locked ?? false,
         opacity: partialLayer.opacity ?? 100,
+        fill: partialLayer.fill ?? 100,
         x: partialLayer.x ?? 0,
         y: partialLayer.y ?? 0,
         width: partialLayer.width ?? project.width,
@@ -961,6 +972,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         visible: true,
         locked: false,
         opacity: 100,
+        fill: 100,
         isExpanded: true,
         parentId: selectedLayers[0].parentId || null,
         x: 0,
@@ -1132,7 +1144,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!layer.visible) continue;
 
       previewCtx.save();
-      previewCtx.globalAlpha = layer.opacity / 100;
+      previewCtx.globalAlpha = (layer.opacity / 100) * ((layer.fill ?? 100) / 100);
       previewCtx.globalCompositeOperation = layer.blendMode;
 
       if (layer.type === "raster" && layer.data) {
@@ -1210,6 +1222,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       visible: true,
       locked: false,
       opacity: 100,
+      fill: 100,
       x: minX,
       y: minY,
       width,
@@ -1400,7 +1413,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     for (const layer of smartProject.layers) {
       if (!layer.visible) continue;
       ctx.save();
-      ctx.globalAlpha = layer.opacity / 100;
+      ctx.globalAlpha = (layer.opacity / 100) * ((layer.fill ?? 100) / 100);
       ctx.globalCompositeOperation = layer.blendMode;
 
       if (layer.type === "raster" && layer.data) {
