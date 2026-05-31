@@ -363,7 +363,7 @@ export class ForgeEngine {
     exportCtx.imageSmoothingEnabled = false;
 
     for (const layer of this.project.layers) {
-      if (layer.visible) {
+      if (layer.visible && !layer.parentId) {
         this.renderLayer(exportCtx, layer);
       }
     }
@@ -1529,8 +1529,13 @@ export class ForgeEngine {
     this.projectCtx.imageSmoothingEnabled = false;
 
     for (const layer of this.project.layers) {
-      if (layer.visible && this.isAncestorVisible(layer)) {
-        if (this.intersects(layer, this.project.width, this.project.height)) {
+      if (layer.visible && !layer.parentId && this.isAncestorVisible(layer)) {
+        // Groups should always be rendered to the buffer if they are top-level,
+        // as they act as containers and their 0-dimension bounds shouldn't cause them to be skipped.
+        if (
+          layer.type === "group" ||
+          this.intersects(layer, this.project.width, this.project.height)
+        ) {
           this.renderLayer(this.projectCtx, layer);
         }
       }
@@ -1563,6 +1568,8 @@ export class ForgeEngine {
     for (const layer of this.project.layers) {
       if (
         layer.visible &&
+        !layer.parentId &&
+        layer.type !== "group" && // Groups are already handled in the buffer loop
         this.isAncestorVisible(layer) &&
         !this.intersects(layer, this.project.width, this.project.height)
       ) {
@@ -1707,7 +1714,14 @@ export class ForgeEngine {
           );
           break;
         case "group":
-          GroupLayer.render(ctx, renderLayerTarget);
+          GroupLayer.render(
+            ctx,
+            renderLayerTarget,
+            this.project!.layers,
+            (c, l) => this.renderLayer(c, l),
+            this.project!.width,
+            this.project!.height,
+          );
           break;
         case "smart_object":
           SmartObjectLayer.render(
@@ -2050,7 +2064,7 @@ export class ForgeEngine {
     }
 
     for (const layer of this.project.layers) {
-      if (layer.visible) {
+      if (layer.visible && !layer.parentId) {
         this.renderLayer(exportCtx, layer);
       }
     }
