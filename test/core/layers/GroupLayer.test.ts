@@ -50,10 +50,10 @@ describe("GroupLayer", () => {
 
     // Should have called renderLayer for the child
     expect(renderLayer).toHaveBeenCalledWith(expect.anything(), child);
-    
+
     // Should have drawn the offscreen buffer back to the main context
     expect(drawImageSpy).toHaveBeenCalled();
-    
+
     // Verify the buffer dimensions (first call to drawImage)
     const [buffer] = drawImageSpy.mock.calls[0] as unknown as [HTMLCanvasElement];
     expect(buffer.width).toBe(projectWidth);
@@ -63,9 +63,36 @@ describe("GroupLayer", () => {
   it("should skip invisible children", () => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
-    
-    const group: Layer = { id: "g1", type: "group", visible: true, locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 0, height: 0, name: "G", blendMode: "source-over" };
-    const child: Layer = { id: "l1", parentId: "g1", visible: false, type: "raster", locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 0, height: 0, name: "C", blendMode: "source-over" };
+
+    const group: Layer = {
+      id: "g1",
+      type: "group",
+      visible: true,
+      locked: false,
+      opacity: 100,
+      fill: 100,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      name: "G",
+      blendMode: "source-over",
+    };
+    const child: Layer = {
+      id: "l1",
+      parentId: "g1",
+      visible: false,
+      type: "raster",
+      locked: false,
+      opacity: 100,
+      fill: 100,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      name: "C",
+      blendMode: "source-over",
+    };
 
     const renderLayer = vi.fn();
     GroupLayer.render(ctx, group, [group, child], renderLayer, 100, 100);

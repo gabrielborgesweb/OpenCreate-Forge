@@ -32,10 +32,22 @@ describe("imageUtils", () => {
     it("should reduce colors based on quality", () => {
       // Create a 2x2 image with 4 distinct colors
       const data = new Uint8ClampedArray([
-        255, 0, 0, 255, // Red
-        0, 255, 0, 255, // Green
-        0, 0, 255, 255, // Blue
-        255, 255, 255, 255, // White
+        255,
+        0,
+        0,
+        255, // Red
+        0,
+        255,
+        0,
+        255, // Green
+        0,
+        0,
+        255,
+        255, // Blue
+        255,
+        255,
+        255,
+        255, // White
       ]);
       const imageData = { data, width: 2, height: 2 } as ImageData;
 

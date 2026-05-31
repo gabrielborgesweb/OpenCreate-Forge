@@ -17,10 +17,62 @@ describe("projectStore reorderLayers", () => {
       width: 800,
       height: 600,
       layers: [
-        { id: "L1", name: "Layer 1", type: "raster", visible: true, locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
-        { id: "L2", name: "Layer 2", type: "raster", visible: true, locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
-        { id: "L3", name: "Layer 3", type: "raster", visible: true, locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
-        { id: "L4", name: "Layer 4", type: "raster", visible: true, locked: false, opacity: 100, fill: 100, x: 0, y: 0, width: 800, height: 600, blendMode: "source-over" },
+        {
+          id: "L1",
+          name: "Layer 1",
+          type: "raster",
+          visible: true,
+          locked: false,
+          opacity: 100,
+          fill: 100,
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 600,
+          blendMode: "source-over",
+        },
+        {
+          id: "L2",
+          name: "Layer 2",
+          type: "raster",
+          visible: true,
+          locked: false,
+          opacity: 100,
+          fill: 100,
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 600,
+          blendMode: "source-over",
+        },
+        {
+          id: "L3",
+          name: "Layer 3",
+          type: "raster",
+          visible: true,
+          locked: false,
+          opacity: 100,
+          fill: 100,
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 600,
+          blendMode: "source-over",
+        },
+        {
+          id: "L4",
+          name: "Layer 4",
+          type: "raster",
+          visible: true,
+          locked: false,
+          opacity: 100,
+          fill: 100,
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 600,
+          blendMode: "source-over",
+        },
       ],
       activeLayerId: "L4",
       selectedLayerIds: ["L4"],
@@ -36,8 +88,8 @@ describe("projectStore reorderLayers", () => {
   });
 
   const getLayerIds = () => {
-    const project = useProjectStore.getState().projects.find(p => p.id === projectId);
-    return project?.layers.map(l => l.id) || [];
+    const project = useProjectStore.getState().projects.find((p) => p.id === projectId);
+    return project?.layers.map((l) => l.id) || [];
   };
 
   it("should move L1 above L2", () => {

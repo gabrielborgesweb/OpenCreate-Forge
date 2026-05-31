@@ -16,7 +16,7 @@ describe("PaintBucketTool", () => {
     context.foregroundColor = "#ff0000";
 
     HTMLCanvasElement.prototype.toDataURL = vi.fn(() => "data:image/png;base64,mock");
-    
+
     // Mock for canvas context used in performFill
     const mockCtx = {
       drawImage: vi.fn(),
@@ -30,8 +30,8 @@ describe("PaintBucketTool", () => {
     };
 
     HTMLCanvasElement.prototype.getContext = vi.fn((type) => {
-        if (type === '2d') return mockCtx;
-        return null;
+      if (type === "2d") return mockCtx;
+      return null;
     }) as any;
 
     context.ensureLayerCanvas = vi.fn(async () => {
@@ -50,7 +50,7 @@ describe("PaintBucketTool", () => {
   it("should trigger fill on mouse down", async () => {
     const tool = new PaintBucketTool();
     const mouseEvent = { button: 0, offsetX: 50, offsetY: 50 } as MouseEvent;
-    
+
     // Mock project state
     context.project.activeLayerId = "layer-1";
     context.project.layers = [
@@ -71,7 +71,7 @@ describe("PaintBucketTool", () => {
     tool.onMouseDown(mouseEvent, context);
 
     // Wait for async performFill
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(context.updateProject).toHaveBeenCalled();
     expect(context.addHistoryEntry).toHaveBeenCalled();
