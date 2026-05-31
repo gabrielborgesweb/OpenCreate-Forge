@@ -16,7 +16,7 @@ export interface RecentProject {
 
 interface RecentProjectsState {
   recentProjects: RecentProject[];
-  
+
   /** Adds or updates a project in the recent list. */
   addRecentProject: (project: RecentProject) => void;
   /** Removes a project from the recent list. */
@@ -36,11 +36,11 @@ export const useRecentProjectsStore = create<RecentProjectsState>()(
         set((state) => {
           // Remove if already exists to move it to the top
           const filtered = state.recentProjects.filter(
-            (p) => p.id !== project.id && p.filePath !== project.filePath
+            (p) => p.id !== project.id && p.filePath !== project.filePath,
           );
-          
+
           const newList = [project, ...filtered].slice(0, MAX_RECENT_PROJECTS);
-          
+
           return { recentProjects: newList };
         }),
 
@@ -54,6 +54,6 @@ export const useRecentProjectsStore = create<RecentProjectsState>()(
     {
       name: "forge-recent-projects-storage",
       storage: createJSONStorage(() => localStorage),
-    }
-  )
+    },
+  ),
 );

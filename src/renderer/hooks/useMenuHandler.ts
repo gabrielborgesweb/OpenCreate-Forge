@@ -177,7 +177,8 @@ export const useMenuHandler = () => {
             const serializableProject = getSerializableProject(activeProject);
             const jsonString = JSON.stringify({ ...serializableProject, version: appVersion });
 
-            const isImage = activeProject.filePath && /\.(png|jpg|jpeg|webp|bmp)$/i.test(activeProject.filePath);
+            const isImage =
+              activeProject.filePath && /\.(png|jpg|jpeg|webp|bmp)$/i.test(activeProject.filePath);
 
             const result = await (window as any).electronAPI.saveProjectAs({
               jsonString,
@@ -274,7 +275,11 @@ export const useMenuHandler = () => {
           break;
 
         case "remove-layer":
-          if (activeProjectId && activeProject && (activeProject.selectedLayerIds?.length ?? 0) > 0) {
+          if (
+            activeProjectId &&
+            activeProject &&
+            (activeProject.selectedLayerIds?.length ?? 0) > 0
+          ) {
             // Safety: Don't delete layer if typing in an input or textarea
             if (isInputFocused) {
               return;

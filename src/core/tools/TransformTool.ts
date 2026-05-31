@@ -101,11 +101,7 @@ export class TransformTool extends BaseTool {
     if (useUIStore.getState().isAnyModalOpen()) return;
 
     const target = e.target as HTMLElement;
-    if (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable
-    ) {
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
       return;
     }
 

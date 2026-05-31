@@ -1,5 +1,5 @@
 /**
- * Purpose: Logic for rendering Smart Object layers. 
+ * Purpose: Logic for rendering Smart Object layers.
  * Smart Objects render their internal project state into a flattened raster buffer for efficient display.
  */
 import { Layer } from "@/renderer/store/projectStore";

@@ -23,7 +23,9 @@ export class PaintBucketTool extends BaseTool {
 
     if (layer.type !== "raster") {
       if (layer.type === "smart_object") {
-        useUIStore.getState().showToast("Cannot fill on a smart object. Double-click to edit its content.", "warning");
+        useUIStore
+          .getState()
+          .showToast("Cannot fill on a smart object. Double-click to edit its content.", "warning");
       } else {
         useUIStore.getState().showToast("Cannot fill on a non-raster layer", "warning");
       }
@@ -67,18 +69,44 @@ export class PaintBucketTool extends BaseTool {
     const targetB = data[targetIdx + 2];
     const targetA = data[targetIdx + 3];
 
-    const settings = context.settings.paintBucket || { tolerance: 40, antiAliasing: true, contiguous: true };
+    const settings = context.settings.paintBucket || {
+      tolerance: 40,
+      antiAliasing: true,
+      contiguous: true,
+    };
     const fillColor = this.hexToRgba(context.foregroundColor);
 
     // If target is same as fill color, do nothing (to avoid infinite loops or redundant work)
     if (
-      this.colorsMatch(targetR, targetG, targetB, targetA, fillColor.r, fillColor.g, fillColor.b, fillColor.a, 0)
+      this.colorsMatch(
+        targetR,
+        targetG,
+        targetB,
+        targetA,
+        fillColor.r,
+        fillColor.g,
+        fillColor.b,
+        fillColor.a,
+        0,
+      )
     ) {
       return;
     }
 
     if (settings.contiguous) {
-      this.floodFill(data, canvas.width, canvas.height, localX, localY, targetR, targetG, targetB, targetA, fillColor, settings.tolerance);
+      this.floodFill(
+        data,
+        canvas.width,
+        canvas.height,
+        localX,
+        localY,
+        targetR,
+        targetG,
+        targetB,
+        targetA,
+        fillColor,
+        settings.tolerance,
+      );
     } else {
       this.globalReplace(data, targetR, targetG, targetB, targetA, fillColor, settings.tolerance);
     }
@@ -116,7 +144,7 @@ export class PaintBucketTool extends BaseTool {
     tb: number,
     ta: number,
     fill: { r: number; g: number; b: number; a: number },
-    tolerance: number
+    tolerance: number,
   ) {
     const stack: [number, number][] = [[startX, startY]];
     const visited = new Uint8Array(width * height);
@@ -125,12 +153,24 @@ export class PaintBucketTool extends BaseTool {
       const [x, y] = stack.pop()!;
       if (x < 0 || x >= width || y < 0 || y >= height) continue;
 
-      const idx = (y * width + x);
+      const idx = y * width + x;
       if (visited[idx]) continue;
       visited[idx] = 1;
 
       const pixelIdx = idx * 4;
-      if (this.colorsMatch(data[pixelIdx], data[pixelIdx + 1], data[pixelIdx + 2], data[pixelIdx + 3], tr, tg, tb, ta, tolerance)) {
+      if (
+        this.colorsMatch(
+          data[pixelIdx],
+          data[pixelIdx + 1],
+          data[pixelIdx + 2],
+          data[pixelIdx + 3],
+          tr,
+          tg,
+          tb,
+          ta,
+          tolerance,
+        )
+      ) {
         data[pixelIdx] = fill.r;
         data[pixelIdx + 1] = fill.g;
         data[pixelIdx + 2] = fill.b;
@@ -151,10 +191,12 @@ export class PaintBucketTool extends BaseTool {
     tb: number,
     ta: number,
     fill: { r: number; g: number; b: number; a: number },
-    tolerance: number
+    tolerance: number,
   ) {
     for (let i = 0; i < data.length; i += 4) {
-      if (this.colorsMatch(data[i], data[i + 1], data[i + 2], data[i + 3], tr, tg, tb, ta, tolerance)) {
+      if (
+        this.colorsMatch(data[i], data[i + 1], data[i + 2], data[i + 3], tr, tg, tb, ta, tolerance)
+      ) {
         data[i] = fill.r;
         data[i + 1] = fill.g;
         data[i + 2] = fill.b;
@@ -163,7 +205,17 @@ export class PaintBucketTool extends BaseTool {
     }
   }
 
-  private colorsMatch(r1: number, g1: number, b1: number, a1: number, r2: number, g2: number, b2: number, a2: number, tolerance: number): boolean {
+  private colorsMatch(
+    r1: number,
+    g1: number,
+    b1: number,
+    a1: number,
+    r2: number,
+    g2: number,
+    b2: number,
+    a2: number,
+    tolerance: number,
+  ): boolean {
     if (tolerance === 0) {
       return r1 === r2 && g1 === g2 && b1 === b2 && a1 === a2;
     }
@@ -180,7 +232,9 @@ export class PaintBucketTool extends BaseTool {
   }
 
   private hexToRgba(hex: string): { r: number; g: number; b: number; a: number } {
-    let r = 0, g = 0, b = 0;
+    let r = 0,
+      g = 0,
+      b = 0;
     const a = 255;
     if (hex.startsWith("#")) {
       if (hex.length === 7) {

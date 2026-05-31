@@ -9,7 +9,11 @@ export const PaintBucketOptions: React.FC = () => {
   const toolSettings = useToolStore((state) => state.toolSettings);
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
 
-  const settings = toolSettings.paintBucket || { tolerance: 40, antiAliasing: true, contiguous: true };
+  const settings = toolSettings.paintBucket || {
+    tolerance: 40,
+    antiAliasing: true,
+    contiguous: true,
+  };
   const { tolerance, antiAliasing, contiguous } = settings;
 
   return (

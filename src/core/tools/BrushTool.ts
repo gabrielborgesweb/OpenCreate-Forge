@@ -98,7 +98,12 @@ export class BrushTool extends BaseTool {
 
     if (layer.type !== "raster") {
       if (layer.type === "smart_object") {
-        useUIStore.getState().showToast("Cannot paint on a smart object. Double-click to edit its content.", "warning");
+        useUIStore
+          .getState()
+          .showToast(
+            "Cannot paint on a smart object. Double-click to edit its content.",
+            "warning",
+          );
       } else {
         useUIStore.getState().showToast("Cannot paint on a non-raster layer", "warning");
       }

@@ -295,7 +295,9 @@ export class ForgeEngine {
 
     // 2. Wait for all raster and smart object images to be loaded and decoded
     const promises = this.project.layers.map(async (layer) => {
-      const sourceData = (layer.type === "smart_object" ? (layer.dataOriginal || layer.data) : layer.data) as string | undefined;
+      const sourceData = (
+        layer.type === "smart_object" ? layer.dataOriginal || layer.data : layer.data
+      ) as string | undefined;
 
       if ((layer.type === "raster" || layer.type === "smart_object") && sourceData) {
         return new Promise<void>((resolve) => {
@@ -1679,8 +1681,7 @@ export class ForgeEngine {
           rotation: 0,
         };
       }
-    }
- else if (layer.rotation) {
+    } else if (layer.rotation) {
       const centerX = layer.x + layer.width / 2;
       const centerY = layer.y + layer.height / 2;
       ctx.translate(centerX, centerY);

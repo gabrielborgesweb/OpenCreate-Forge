@@ -1,7 +1,10 @@
 /**
  * Purpose: Utility functions for checking the clipboard for image data and retrieving dimensions.
  */
-export const getClipboardImageDimensions = async (): Promise<{ width: number; height: number } | null> => {
+export const getClipboardImageDimensions = async (): Promise<{
+  width: number;
+  height: number;
+} | null> => {
   try {
     const items = await navigator.clipboard.read();
     for (const item of items) {
