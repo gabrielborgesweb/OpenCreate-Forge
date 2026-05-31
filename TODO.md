@@ -18,8 +18,8 @@ TODO: OpenCreate Forge
 - [ ] Ferramenta de Degradê (Gradient)
 - [ ] Layer Masks
 - [ ] Layer Styles (stroke, text-stroke, drop-shadow, etc)
-- [ ] Layer Blending Modes
-- [ ] Layer Opacity, Fill
+- [x] Layer Blending Modes
+- [x] Layer Opacity, Fill
 - [x] Smart Objects
   - Smart Objects são camadas que basicamente é um projeto em JSON (armazenado em `dataObject` ao lado de `data` que guardará a renderização de `dataObject`)
   - [x] Poder converter uma camada (ou várias camadas) em Smart Object no menu de contexto das camadas
